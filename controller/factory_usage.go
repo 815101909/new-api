@@ -9,9 +9,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -248,11 +246,10 @@ func convertFactoryUsageCnyToQuota(amountCny float64) (int, error) {
 	if amountCny <= 0 {
 		return 0, errors.New("充值金额必须大于 0")
 	}
-	if operation_setting.USDExchangeRate <= 0 || common.QuotaPerUnit <= 0 {
+	if common.QuotaPerUnit <= 0 {
 		return 0, errors.New("New API 额度换算配置异常")
 	}
 	quota := decimal.NewFromFloat(amountCny).
-		Div(decimal.NewFromFloat(operation_setting.USDExchangeRate)).
 		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
 		Round(0).
 		IntPart()
@@ -336,13 +333,21 @@ func TopupFactoryUsageToken(c *gin.Context) {
 
 	factoryUsername := strings.TrimSpace(req.FactoryUsername)
 	content := fmt.Sprintf(
-		"创作工厂令牌充值，创作工厂账号：%s，充值金额：¥%.2f，充值额度：%s",
+		"创作工厂令牌充值，创作工厂账号：%s，充值金额：¥%.2f，到账金额：¥%.2f",
 		factoryUsername,
 		req.AmountCny,
-		logger.FormatQuota(quota),
+		req.AmountCny,
 	)
 	if remark := strings.TrimSpace(req.Remark); remark != "" {
 		content = fmt.Sprintf("%s，备注：%s", content, remark)
+	}
+	audit := map[string]interface{}{
+		"source":            "aigc_factory",
+		"amount_cny":        req.AmountCny,
+		"amount_usd":        req.AmountCny,
+		"quota":             quota,
+		"quota_per_unit":    common.QuotaPerUnit,
+		"usd_exchange_rate": 1,
 	}
 	log := &model.Log{
 		UserId:    token.UserId,
@@ -355,7 +360,7 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		Quota:     quota,
 		Ip:        c.ClientIP(),
 		RequestId: c.GetString(common.RequestIdKey),
-		Other:     common.MapToJsonStr(map[string]interface{}{"source": "aigc_factory"}),
+		Other:     common.MapToJsonStr(audit),
 	}
 	if err := model.LOG_DB.Create(log).Error; err != nil {
 		common.SysLog("failed to record factory token topup log: " + err.Error())
@@ -383,9 +388,9 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		"binding":           payload,
 		"quota":             quota,
 		"amount_cny":        req.AmountCny,
-		"amount_usd":        req.AmountCny / operation_setting.USDExchangeRate,
+		"amount_usd":        req.AmountCny,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": operation_setting.USDExchangeRate,
+		"usd_exchange_rate": 1,
 	})
 }
 
@@ -406,7 +411,7 @@ func GetFactoryUsageLogs(c *gin.Context) {
 			"bound":             false,
 			"binding":           nil,
 			"quota_per_unit":    common.QuotaPerUnit,
-			"usd_exchange_rate": operation_setting.USDExchangeRate,
+			"usd_exchange_rate": 1,
 			"page":              pageInfo,
 		})
 		return
@@ -442,7 +447,7 @@ func GetFactoryUsageLogs(c *gin.Context) {
 		"bound":             true,
 		"binding":           target.Binding,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": operation_setting.USDExchangeRate,
+		"usd_exchange_rate": 1,
 		"page":              pageInfo,
 	})
 }
@@ -467,7 +472,7 @@ func GetFactoryUsageStat(c *gin.Context) {
 			"amount_usd":        0,
 			"amount_cny":        0,
 			"quota_per_unit":    common.QuotaPerUnit,
-			"usd_exchange_rate": operation_setting.USDExchangeRate,
+			"usd_exchange_rate": 1,
 		})
 		return
 	}
@@ -482,7 +487,7 @@ func GetFactoryUsageStat(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	amountUsd := float64(stat.Quota) / common.QuotaPerUnit
+	amountCny := float64(stat.Quota) / common.QuotaPerUnit
 	common.ApiSuccess(c, gin.H{
 		"bound":             true,
 		"binding":           target.Binding,
@@ -490,9 +495,9 @@ func GetFactoryUsageStat(c *gin.Context) {
 		"rpm":               stat.Rpm,
 		"tpm":               stat.Tpm,
 		"tokens":            stat.Tokens,
-		"amount_usd":        amountUsd,
-		"amount_cny":        amountUsd * operation_setting.USDExchangeRate,
+		"amount_usd":        amountCny,
+		"amount_cny":        amountCny,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": operation_setting.USDExchangeRate,
+		"usd_exchange_rate": 1,
 	})
 }
