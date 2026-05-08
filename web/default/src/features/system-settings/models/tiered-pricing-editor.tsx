@@ -81,7 +81,7 @@ import {
   tryParseVisualConfig,
 } from '@/features/pricing/lib/tier-expr'
 
-const PRICE_SUFFIX = '$/1M tokens'
+const PRICE_SUFFIX = '¥/1M tokens'
 const CACHE_PRICE_VARS = BILLING_EXTRA_VARS.filter(
   (variable) => variable.group === 'cache'
 )
@@ -115,16 +115,16 @@ const PRESET_GROUPS: PresetGroup[] = [
   {
     group: 'Fixed price',
     presets: [
-      { key: 'flat', label: 'Flat', expr: 'tier("base", p * 2 + c * 4)' },
+      { key: 'flat', label: 'Flat', expr: 'tier("base", p * 14.6 + c * 29.2)' },
       {
         key: 'claude-opus',
         label: 'Claude Opus 4.6',
-        expr: 'tier("base", p * 5 + c * 25 + cr * 0.5 + cc * 6.25 + cc1h * 10)',
+        expr: 'tier("base", p * 36.5 + c * 182.5 + cr * 3.65 + cc * 45.625 + cc1h * 73)',
       },
       {
         key: 'gpt-5.4',
         label: 'GPT-5.4',
-        expr: 'len <= 272000 ? tier("standard", p * 2.5 + c * 15 + cr * 0.25) : tier("long_context", p * 5 + c * 22.5 + cr * 0.5)',
+        expr: 'len <= 272000 ? tier("standard", p * 18.25 + c * 109.5 + cr * 1.825) : tier("long_context", p * 36.5 + c * 164.25 + cr * 3.65)',
       },
     ],
   },
@@ -134,22 +134,22 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'claude-sonnet',
         label: 'Claude Sonnet 4.5',
-        expr: 'len <= 200000 ? tier("standard", p * 3 + c * 15 + cr * 0.3 + cc * 3.75 + cc1h * 6) : tier("long_context", p * 6 + c * 22.5 + cr * 0.6 + cc * 7.5 + cc1h * 12)',
+        expr: 'len <= 200000 ? tier("standard", p * 21.9 + c * 109.5 + cr * 2.19 + cc * 27.375 + cc1h * 43.8) : tier("long_context", p * 43.8 + c * 164.25 + cr * 4.38 + cc * 54.75 + cc1h * 87.6)',
       },
       {
         key: 'qwen3-max',
         label: 'Qwen3 Max',
-        expr: 'len <= 32000 ? tier("short", p * 1.2 + c * 6 + cr * 0.24 + cc * 1.5) : len <= 128000 ? tier("mid", p * 2.4 + c * 12 + cr * 0.48 + cc * 3) : tier("long", p * 3 + c * 15 + cr * 0.6 + cc * 3.75)',
+        expr: 'len <= 32000 ? tier("short", p * 8.76 + c * 43.8 + cr * 1.752 + cc * 10.95) : len <= 128000 ? tier("mid", p * 17.52 + c * 87.6 + cr * 3.504 + cc * 21.9) : tier("long", p * 21.9 + c * 109.5 + cr * 4.38 + cc * 27.375)',
       },
       {
         key: 'glm-4.5-air',
         label: 'GLM-4.5 Air',
-        expr: 'len < 32000 && c < 200 ? tier("short_output", p * 0.8 + c * 2 + cr * 0.16) : len < 32000 && c >= 200 ? tier("long_output", p * 0.8 + c * 6 + cr * 0.16) : tier("mid_context", p * 1.2 + c * 8 + cr * 0.24)',
+        expr: 'len < 32000 && c < 200 ? tier("short_output", p * 5.84 + c * 14.6 + cr * 1.168) : len < 32000 && c >= 200 ? tier("long_output", p * 5.84 + c * 43.8 + cr * 1.168) : tier("mid_context", p * 8.76 + c * 58.4 + cr * 1.752)',
       },
       {
         key: 'doubao-seed-1.8',
         label: 'Doubao Seed 1.8',
-        expr: 'len <= 32000 && c <= 200 ? tier("discount", p * 0.8 + c * 2 + cr * 0.16 + cc * 0.17) : len <= 32000 ? tier("short", p * 0.8 + c * 8 + cr * 0.16 + cc * 0.17) : len <= 128000 ? tier("mid", p * 1.2 + c * 16 + cr * 0.16 + cc * 0.17) : tier("long", p * 2.4 + c * 24 + cr * 0.16 + cc * 0.17)',
+        expr: 'len <= 32000 && c <= 200 ? tier("discount", p * 5.84 + c * 14.6 + cr * 1.168 + cc * 1.241) : len <= 32000 ? tier("short", p * 5.84 + c * 58.4 + cr * 1.168 + cc * 1.241) : len <= 128000 ? tier("mid", p * 8.76 + c * 116.8 + cr * 1.168 + cc * 1.241) : tier("long", p * 17.52 + c * 175.2 + cr * 1.168 + cc * 1.241)',
       },
     ],
   },
@@ -159,22 +159,22 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'gpt-image-1-mini',
         label: 'GPT Image 1 Mini',
-        expr: 'tier("base", p * 2 + c * 8 + img * 2.5)',
+        expr: 'tier("base", p * 14.6 + c * 58.4 + img * 18.25)',
       },
       {
         key: 'gemini-2.5-flash',
         label: 'Gemini 2.5 Flash',
-        expr: 'tier("base", p * 0.3 + c * 2.5 + cr * 0.03 + ai * 1.0)',
+        expr: 'tier("base", p * 2.19 + c * 18.25 + cr * 0.219 + ai * 7.3)',
       },
       {
         key: 'gemini-3-pro-image',
         label: 'Gemini 3 Pro Image',
-        expr: 'tier("base", p * 2 + c * 12 + img_o * 120)',
+        expr: 'tier("base", p * 14.6 + c * 87.6 + img_o * 876)',
       },
       {
         key: 'qwen3-omni-flash',
         label: 'Qwen3 Omni Flash',
-        expr: 'tier("base", p * 0.43 + c * 3.06 + img * 0.78 + ai * 3.81 + ao * 15.11)',
+        expr: 'tier("base", p * 3.139 + c * 22.338 + img * 5.694 + ai * 27.813 + ao * 110.303)',
       },
     ],
   },
@@ -184,7 +184,7 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'claude-opus-fast',
         label: 'Claude Opus 4.6 Fast',
-        expr: 'tier("base", p * 5 + c * 25 + cr * 0.5 + cc * 6.25 + cc1h * 10)',
+        expr: 'tier("base", p * 36.5 + c * 182.5 + cr * 3.65 + cc * 45.625 + cc1h * 73)',
         requestRules: [
           {
             conditions: [
@@ -202,7 +202,7 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'gpt-5.4-tiers',
         label: 'GPT-5.4 Priority/Flex',
-        expr: 'len <= 272000 ? tier("standard", p * 2.5 + c * 15 + cr * 0.25) : tier("long_context", p * 5 + c * 22.5 + cr * 0.5)',
+        expr: 'len <= 272000 ? tier("standard", p * 18.25 + c * 109.5 + cr * 1.825) : tier("long_context", p * 36.5 + c * 164.25 + cr * 3.65)',
         requestRules: [
           {
             conditions: [
@@ -236,7 +236,7 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'night-discount',
         label: 'Night discount (50%)',
-        expr: 'tier("base", p * 3 + c * 15)',
+        expr: 'tier("base", p * 21.9 + c * 109.5)',
         requestRules: [
           {
             conditions: [
@@ -257,7 +257,7 @@ const PRESET_GROUPS: PresetGroup[] = [
       {
         key: 'weekend-discount',
         label: 'Weekend discount (80%)',
-        expr: 'tier("base", p * 3 + c * 15)',
+        expr: 'tier("base", p * 21.9 + c * 109.5)',
         requestRules: [
           {
             conditions: [
@@ -350,6 +350,7 @@ function DraftNumberInput({
 
   useEffect(() => {
     if (!focused) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft(formatNumberDraft(value))
     }
   }, [focused, value])
@@ -576,6 +577,7 @@ function VisualTierCard({
   const [mediaOpen, setMediaOpen] = useState(hasMediaPricing)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (hasMediaPricing) setMediaOpen(true)
   }, [hasMediaPricing])
 
@@ -1495,33 +1497,33 @@ Important: len is NOT affected by auto-exclusion. Tier conditions should use len
 
 ### Price Coefficients
 
-Numbers in the expression are $/1M tokens prices. For example, p * 2.5 means input $2.50/1M tokens.
+Numbers in the expression are CNY/1M tokens prices. For example, p * 18.25 means input ¥18.25/1M tokens.
 
 ## Expression Examples
 
 Simple pricing:
-tier("base", p * 2.5 + c * 15)
+tier("base", p * 18.25 + c * 109.5)
 
 With cache:
-tier("base", p * 2.5 + c * 15 + cr * 0.25)
+tier("base", p * 18.25 + c * 109.5 + cr * 1.825)
 
 Multi-tier (use len for conditions):
 len <= 200000
-  ? tier("standard", p * 3 + c * 15 + cr * 0.3 + cc * 3.75 + cc1h * 6)
-  : tier("long_context", p * 6 + c * 22.5 + cr * 0.6 + cc * 7.5 + cc1h * 12)
+  ? tier("standard", p * 21.9 + c * 109.5 + cr * 2.19 + cc * 27.375 + cc1h * 43.8)
+  : tier("long_context", p * 43.8 + c * 164.25 + cr * 4.38 + cc * 54.75 + cc1h * 87.6)
 
 Image model:
-tier("base", p * 2 + c * 8 + img * 2.5)
+tier("base", p * 14.6 + c * 58.4 + img * 18.25)
 
 Multimodal with audio:
-tier("base", p * 0.43 + c * 3.06 + img * 0.78 + ai * 3.81 + ao * 15.11)
+tier("base", p * 3.139 + c * 22.338 + img * 5.694 + ai * 27.813 + ao * 110.303)
 
 Three-tier example:
 len <= 128000
-  ? tier("standard", p * 1.1 + c * 4.4)
+  ? tier("standard", p * 8.03 + c * 32.12)
   : (len <= 1000000
-    ? tier("medium", p * 2.2 + c * 8.8)
-    : tier("long", p * 4.4 + c * 17.6))
+    ? tier("medium", p * 16.06 + c * 64.24)
+    : tier("long", p * 32.12 + c * 128.48))
 
 ## Rules
 
@@ -1529,7 +1531,7 @@ len <= 128000
 2. Use English tier names, e.g. "base", "standard", "long_context"
 3. Use len for tier conditions (not p), supports <, <=, >, >=
 4. Multi-tier uses nested ternary: cond1 ? tier(...) : (cond2 ? tier(...) : tier(...))
-5. Price coefficients are the provider's official $/1M tokens prices
+5. Price coefficients are the provider's official CNY/1M tokens prices
 6. If cache/image/audio don't need separate pricing, omit those variables; their tokens are included in p/c automatically
 
 Please generate a billing expression based on the model information and pricing requirements provided.`

@@ -45,7 +45,6 @@ import { safeJsonParse } from '../utils/json-parser'
 import {
   ModelPricingEditorPanel,
   ModelPricingSheet,
-  type PriceCurrency,
   type ModelRatioData,
 } from './model-pricing-sheet'
 
@@ -60,8 +59,6 @@ type ModelRatioVisualEditorProps = {
   audioCompletionRatio: string
   billingMode: string
   billingExpr: string
-  usdExchangeRate?: number
-  defaultPriceCurrency?: PriceCurrency
   onChange: (field: string, value: string) => void
 }
 
@@ -101,23 +98,13 @@ const formatInternalPrice = (value: number) => {
   return Number.parseFloat(value.toFixed(PRICE_INTERNAL_DECIMALS)).toString()
 }
 
-const getSafeExchangeRate = (value: unknown) => {
-  const rate = Number(value)
-  return Number.isFinite(rate) && rate > 0 ? rate : 7
-}
+const getPriceCurrencySymbol = () => '¥'
 
-const getPriceCurrencySymbol = (currency: PriceCurrency) =>
-  currency === 'CNY' ? '¥' : '$'
-
-const formatPriceWithCurrency = (
-  value: string | number | undefined,
-  currency: PriceCurrency,
-  _usdExchangeRate: number
-) => {
+const formatPriceWithCurrency = (value: string | number | undefined) => {
   const numericValue =
     typeof value === 'number' ? value : toNumberOrNull(value?.toString())
   if (numericValue === null) return ''
-  return `${getPriceCurrencySymbol(currency)}${formatPrice(numericValue)}`
+  return `${getPriceCurrencySymbol()}${formatPrice(numericValue)}`
 }
 
 const ratioToPrice = (ratio?: string, denominator?: string) => {
@@ -155,18 +142,13 @@ const getExpressionSummary = (row: ModelRow, t: (key: string) => string) => {
   return t('Expression pricing')
 }
 
-const getPriceSummary = (
-  row: ModelRow,
-  t: (key: string) => string,
-  currency: PriceCurrency,
-  usdExchangeRate: number
-) => {
+const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
   if (row.billingMode === 'tiered_expr') {
     return getExpressionSummary(row, t)
   }
   if (row.billingMode === 'per-request') {
     return row.price
-      ? `${formatPriceWithCurrency(row.price, currency, usdExchangeRate)} / ${t('request')}`
+      ? `${formatPriceWithCurrency(row.price)} / ${t('request')}`
       : t('Unset price')
   }
 
@@ -183,16 +165,11 @@ const getPriceSummary = (
   ].filter(hasValue).length
 
   return extraCount > 0
-    ? `${t('Input')} ${formatPriceWithCurrency(inputPrice, currency, usdExchangeRate)} · ${extraCount} ${t('extras')}`
-    : `${t('Input')} ${formatPriceWithCurrency(inputPrice, currency, usdExchangeRate)}`
+    ? `${t('Input')} ${formatPriceWithCurrency(inputPrice)} · ${extraCount} ${t('extras')}`
+    : `${t('Input')} ${formatPriceWithCurrency(inputPrice)}`
 }
 
-const getPriceDetail = (
-  row: ModelRow,
-  t: (key: string) => string,
-  currency: PriceCurrency,
-  usdExchangeRate: number
-) => {
+const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
   if (row.billingMode === 'tiered_expr') {
     return row.requestRuleExpr
       ? t('Includes request rules')
@@ -208,21 +185,15 @@ const getPriceDetail = (
   const details = [
     row.completionRatio &&
       `${t('Output')} ${formatPriceWithCurrency(
-        ratioToPrice(row.completionRatio, inputPrice),
-        currency,
-        usdExchangeRate
+        ratioToPrice(row.completionRatio, inputPrice)
       )}`,
     row.cacheRatio &&
       `${t('Cache')} ${formatPriceWithCurrency(
-        ratioToPrice(row.cacheRatio, inputPrice),
-        currency,
-        usdExchangeRate
+        ratioToPrice(row.cacheRatio, inputPrice)
       )}`,
     row.createCacheRatio &&
       `${t('Cache write')} ${formatPriceWithCurrency(
-        ratioToPrice(row.createCacheRatio, inputPrice),
-        currency,
-        usdExchangeRate
+        ratioToPrice(row.createCacheRatio, inputPrice)
       )}`,
   ].filter(Boolean)
 
@@ -241,15 +212,10 @@ export const ModelRatioVisualEditor = memo(
     audioCompletionRatio,
     billingMode,
     billingExpr,
-    usdExchangeRate = 7,
-    defaultPriceCurrency = 'USD',
     onChange,
   }: ModelRatioVisualEditorProps) {
     const { t } = useTranslation()
     const isMobile = useMediaQuery('(max-width: 767px)')
-    const safeUsdExchangeRate = getSafeExchangeRate(usdExchangeRate)
-    const [priceCurrency, setPriceCurrency] =
-      useState<PriceCurrency>(defaultPriceCurrency)
     const [sheetOpen, setSheetOpen] = useState(false)
     const [editorOpen, setEditorOpen] = useState(false)
     const [editData, setEditData] = useState<ModelRatioData | null>(null)
@@ -299,10 +265,6 @@ export const ModelRatioVisualEditor = memo(
     useEffect(() => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
     }, [columnVisibility])
-
-    useEffect(() => {
-      setPriceCurrency(defaultPriceCurrency)
-    }, [defaultPriceCurrency])
 
     const models = useMemo(() => {
       const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
@@ -679,36 +641,16 @@ export const ModelRatioVisualEditor = memo(
           cell: ({ row }) => (
             <div className='flex min-w-[180px] flex-col gap-1'>
               <span className='font-medium'>
-                {getPriceSummary(
-                  row.original,
-                  t,
-                  priceCurrency,
-                  safeUsdExchangeRate
-                )}
+                {getPriceSummary(row.original, t)}
               </span>
               <span className='text-muted-foreground max-w-[320px] truncate text-xs'>
-                {getPriceDetail(
-                  row.original,
-                  t,
-                  priceCurrency,
-                  safeUsdExchangeRate
-                )}
+                {getPriceDetail(row.original, t)}
               </span>
             </div>
           ),
           sortingFn: (rowA, rowB) =>
-            getPriceSummary(
-              rowA.original,
-              t,
-              priceCurrency,
-              safeUsdExchangeRate
-            ).localeCompare(
-              getPriceSummary(
-                rowB.original,
-                t,
-                priceCurrency,
-                safeUsdExchangeRate
-              )
+            getPriceSummary(rowA.original, t).localeCompare(
+              getPriceSummary(rowB.original, t)
             ),
           meta: { label: t('Price summary') },
         },
@@ -735,7 +677,7 @@ export const ModelRatioVisualEditor = memo(
           enableHiding: false,
         },
       ]
-    }, [handleEdit, handleDelete, priceCurrency, safeUsdExchangeRate, t])
+    }, [handleEdit, handleDelete, t])
 
     const table = useReactTable({
       data: models,
@@ -1047,9 +989,6 @@ export const ModelRatioVisualEditor = memo(
                 onCancel={handleCancel}
                 editData={editData}
                 selectedTargetCount={selectedTargetCount}
-                usdExchangeRate={safeUsdExchangeRate}
-                priceCurrency={priceCurrency}
-                onPriceCurrencyChange={setPriceCurrency}
                 className='sticky top-4 h-[calc(100vh-8rem)] min-h-[620px]'
               />
             ) : (
@@ -1088,9 +1027,6 @@ export const ModelRatioVisualEditor = memo(
             onCancel={handleCancel}
             editData={editData}
             selectedTargetCount={selectedTargetCount}
-            usdExchangeRate={safeUsdExchangeRate}
-            priceCurrency={priceCurrency}
-            onPriceCurrencyChange={setPriceCurrency}
           />
         )}
       </div>
@@ -1109,8 +1045,6 @@ export const ModelRatioVisualEditor = memo(
       prevProps.audioCompletionRatio === nextProps.audioCompletionRatio &&
       prevProps.billingMode === nextProps.billingMode &&
       prevProps.billingExpr === nextProps.billingExpr &&
-      prevProps.usdExchangeRate === nextProps.usdExchangeRate &&
-      prevProps.defaultPriceCurrency === nextProps.defaultPriceCurrency &&
       prevProps.onChange === nextProps.onChange
     )
   }

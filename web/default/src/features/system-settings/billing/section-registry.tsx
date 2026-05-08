@@ -1,4 +1,3 @@
-import { parseCurrencyDisplayType } from '@/lib/currency'
 import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
@@ -63,19 +62,7 @@ const BILLING_SECTIONS = [
     build: (settings: BillingSettings) => (
       <PricingSection
         defaultValues={{
-          QuotaPerUnit: settings.QuotaPerUnit,
-          USDExchangeRate: settings.USDExchangeRate,
-          DisplayInCurrencyEnabled: settings.DisplayInCurrencyEnabled,
           DisplayTokenStatEnabled: settings.DisplayTokenStatEnabled,
-          general_setting: {
-            quota_display_type: parseCurrencyDisplayType(
-              settings['general_setting.quota_display_type']
-            ),
-            custom_currency_symbol:
-              settings['general_setting.custom_currency_symbol'] ?? '¤',
-            custom_currency_exchange_rate:
-              settings['general_setting.custom_currency_exchange_rate'] ?? 1,
-          },
         }}
       />
     ),
@@ -92,12 +79,6 @@ const BILLING_SECTIONS = [
         groupDefaults={getGroupDefaults(settings)}
         toolPricesDefault={settings['tool_price_setting.prices']}
         visibleTabs={['models', 'tool-prices', 'upstream-sync']}
-        usdExchangeRate={settings.USDExchangeRate}
-        defaultPriceCurrency={
-          settings['general_setting.quota_display_type'] === 'CNY'
-            ? 'CNY'
-            : 'USD'
-        }
       />
     ),
   },

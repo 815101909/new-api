@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -67,7 +67,6 @@ type ModelPricingFormValues = z.infer<
 >
 
 type PricingMode = 'per-token' | 'per-request' | 'tiered_expr'
-export type PriceCurrency = 'USD' | 'CNY'
 type LaneKey =
   | 'completion'
   | 'cache'
@@ -98,9 +97,6 @@ type ModelPricingSheetProps = {
   onCancel?: () => void
   editData?: ModelRatioData | null
   selectedTargetCount?: number
-  usdExchangeRate?: number
-  priceCurrency?: PriceCurrency
-  onPriceCurrencyChange?: (currency: PriceCurrency) => void
 }
 
 type ModelPricingEditorPanelProps = Omit<
@@ -215,43 +211,25 @@ function formatPriceDisplayNumber(value: unknown): string {
   return Number.parseFloat(num.toFixed(PRICE_DISPLAY_DECIMALS)).toString()
 }
 
-function getSafeExchangeRate(value: unknown): number {
-  const rate = Number(value)
-  return Number.isFinite(rate) && rate > 0 ? rate : 7
+function getPriceCurrencySymbol(): '¥' {
+  return '¥'
 }
 
-function getPriceCurrencySymbol(currency: PriceCurrency): '$' | '¥' {
-  return currency === 'CNY' ? '¥' : '$'
-}
-
-function convertPriceDraft(
-  value: string | undefined,
-  _fromCurrency: PriceCurrency,
-  _toCurrency: PriceCurrency,
-  _usdExchangeRate: number
-): string {
+function convertPriceDraft(value: string | undefined): string {
   if (!value) return ''
   const num = toNumberOrNull(value)
   if (num === null) return value
   return formatPriceDisplayNumber(num)
 }
 
-function displayPriceToUsd(
-  value: string | undefined,
-  _currency: PriceCurrency,
-  _usdExchangeRate: number
-): string {
+function displayPrice(value: string | undefined): string {
   if (!value) return ''
   const num = toNumberOrNull(value)
   if (num === null) return value
   return formatNumber(num)
 }
 
-function displayPriceToUsdNumber(
-  value: string,
-  _currency: PriceCurrency,
-  _usdExchangeRate: number
-): number | null {
+function displayPriceNumber(value: string): number | null {
   const num = toNumberOrNull(value)
   if (num === null) return null
   return num
@@ -259,12 +237,11 @@ function displayPriceToUsdNumber(
 
 function formatDisplayPrice(
   value: string | undefined,
-  currency: PriceCurrency,
   t: (key: string) => string
 ): string {
   const displayValue = formatPriceDisplayNumber(value)
   return displayValue
-    ? `${getPriceCurrencySymbol(currency)}${displayValue}`
+    ? `${getPriceCurrencySymbol()}${displayValue}`
     : t('Empty')
 }
 
@@ -341,7 +318,6 @@ function buildPreviewRows(
   promptPrice: string,
   lanePrices: Record<LaneKey, string>,
   laneEnabled: Record<LaneKey, boolean>,
-  priceCurrency: PriceCurrency,
   t: (key: string) => string
 ): PreviewRow[] {
   if (mode === 'tiered_expr') {
@@ -362,7 +338,7 @@ function buildPreviewRows(
       {
         key: 'price',
         label: 'ModelPrice',
-        value: formatDisplayPrice(values.price, priceCurrency, t),
+        value: formatDisplayPrice(values.price, t),
       },
     ]
   }
@@ -371,14 +347,14 @@ function buildPreviewRows(
     {
       key: 'inputPrice',
       label: t('Input price'),
-      value: formatDisplayPrice(promptPrice, priceCurrency, t),
+      value: formatDisplayPrice(promptPrice, t),
     },
     {
       key: 'completion',
       label: t('Completion price'),
       value:
         laneEnabled.completion && lanePrices.completion
-          ? formatDisplayPrice(lanePrices.completion, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.completion, t)
           : t('Empty'),
     },
     {
@@ -386,7 +362,7 @@ function buildPreviewRows(
       label: t('Cache read price'),
       value:
         laneEnabled.cache && lanePrices.cache
-          ? formatDisplayPrice(lanePrices.cache, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.cache, t)
           : t('Empty'),
     },
     {
@@ -394,7 +370,7 @@ function buildPreviewRows(
       label: t('Cache write price'),
       value:
         laneEnabled.createCache && lanePrices.createCache
-          ? formatDisplayPrice(lanePrices.createCache, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.createCache, t)
           : t('Empty'),
     },
     {
@@ -402,7 +378,7 @@ function buildPreviewRows(
       label: t('Image input price'),
       value:
         laneEnabled.image && lanePrices.image
-          ? formatDisplayPrice(lanePrices.image, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.image, t)
           : t('Empty'),
     },
     {
@@ -410,7 +386,7 @@ function buildPreviewRows(
       label: t('Audio input price'),
       value:
         laneEnabled.audioInput && lanePrices.audioInput
-          ? formatDisplayPrice(lanePrices.audioInput, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.audioInput, t)
           : t('Empty'),
     },
     {
@@ -418,7 +394,7 @@ function buildPreviewRows(
       label: t('Audio output price'),
       value:
         laneEnabled.audioOutput && lanePrices.audioOutput
-          ? formatDisplayPrice(lanePrices.audioOutput, priceCurrency, t)
+          ? formatDisplayPrice(lanePrices.audioOutput, t)
           : t('Empty'),
     },
   ]
@@ -431,9 +407,6 @@ export function ModelPricingSheet({
   onCancel,
   editData,
   selectedTargetCount = 0,
-  usdExchangeRate,
-  priceCurrency,
-  onPriceCurrencyChange,
 }: ModelPricingSheetProps) {
   const { t } = useTranslation()
   const title = editData ? t('Edit model pricing') : t('Add model pricing')
@@ -450,9 +423,6 @@ export function ModelPricingSheet({
           onSave={onSave}
           editData={editData}
           selectedTargetCount={selectedTargetCount}
-          usdExchangeRate={usdExchangeRate}
-          priceCurrency={priceCurrency}
-          onPriceCurrencyChange={onPriceCurrencyChange}
           onCancel={() => {
             onCancel?.()
             onOpenChange(false)
@@ -468,9 +438,6 @@ export function ModelPricingEditorPanel({
   onSave,
   editData,
   selectedTargetCount = 0,
-  usdExchangeRate = 7,
-  priceCurrency,
-  onPriceCurrencyChange,
   onCancel,
   className,
 }: ModelPricingEditorPanelProps) {
@@ -486,16 +453,7 @@ export function ModelPricingEditorPanel({
   const [billingExpr, setBillingExpr] = useState('')
   const [requestRuleExpr, setRequestRuleExpr] = useState('')
   const [previewOpen, setPreviewOpen] = useState(true)
-  const [internalPriceCurrency, setInternalPriceCurrency] =
-    useState<PriceCurrency>('USD')
   const isEditMode = !!editData
-  const activePriceCurrency = priceCurrency ?? internalPriceCurrency
-  const safeUsdExchangeRate = getSafeExchangeRate(usdExchangeRate)
-  const activePriceCurrencyRef = useRef(activePriceCurrency)
-
-  useEffect(() => {
-    activePriceCurrencyRef.current = activePriceCurrency
-  }, [activePriceCurrency])
 
   const form = useForm<ModelPricingFormValues>({
     resolver: zodResolver(createModelPricingSchema(t)),
@@ -514,34 +472,18 @@ export function ModelPricingEditorPanel({
 
   useEffect(() => {
     const nextLaneState = createInitialLaneState(editData)
-    const initialPriceCurrency = activePriceCurrencyRef.current
-    const convertedPromptPrice = convertPriceDraft(
-      nextLaneState.promptPrice,
-      'USD',
-      initialPriceCurrency,
-      safeUsdExchangeRate
-    )
+    const convertedPromptPrice = convertPriceDraft(nextLaneState.promptPrice)
     const convertedLanePrices = Object.fromEntries(
       Object.entries(nextLaneState.prices).map(([key, value]) => [
         key,
-        convertPriceDraft(
-          value,
-          'USD',
-          initialPriceCurrency,
-          safeUsdExchangeRate
-        ),
+        convertPriceDraft(value),
       ])
     ) as Record<LaneKey, string>
 
     if (editData) {
       form.reset({
         name: editData.name,
-        price: convertPriceDraft(
-          editData.price || '',
-          'USD',
-          initialPriceCurrency,
-          safeUsdExchangeRate
-        ),
+        price: convertPriceDraft(editData.price || ''),
         ratio: editData.ratio || '',
         cacheRatio: editData.cacheRatio || '',
         createCacheRatio: editData.createCacheRatio || '',
@@ -580,7 +522,7 @@ export function ModelPricingEditorPanel({
     setLanePrices(convertedLanePrices)
     setLaneEnabled(nextLaneState.enabled)
     setPreviewOpen(true)
-  }, [editData, form, safeUsdExchangeRate])
+  }, [editData, form])
 
   const setFormValue = (field: keyof ModelPricingFormValues, value: string) => {
     form.setValue(field, value, {
@@ -612,14 +554,9 @@ export function ModelPricingEditorPanel({
   const syncLaneRatios = (
     nextPromptPrice = promptPrice,
     nextLanePrices = lanePrices,
-    nextLaneEnabled = laneEnabled,
-    nextPriceCurrency = activePriceCurrency
+    nextLaneEnabled = laneEnabled
   ) => {
-    const inputPrice = displayPriceToUsdNumber(
-      nextPromptPrice,
-      nextPriceCurrency,
-      safeUsdExchangeRate
-    )
+    const inputPrice = displayPriceNumber(nextPromptPrice)
     setFormValue(
       'ratio',
       inputPrice !== null ? formatNumber(inputPrice / 2) : ''
@@ -647,44 +584,6 @@ export function ModelPricingEditorPanel({
     if (!numericDraftRegex.test(value)) return
     setPromptPrice(value)
     syncLaneRatios(value, lanePrices, laneEnabled)
-  }
-
-  const handlePriceCurrencyChange = (nextCurrency: PriceCurrency) => {
-    if (nextCurrency === activePriceCurrency) return
-
-    const nextPromptPrice = convertPriceDraft(
-      promptPrice,
-      activePriceCurrency,
-      nextCurrency,
-      safeUsdExchangeRate
-    )
-    const nextLanePrices = Object.fromEntries(
-      Object.entries(lanePrices).map(([key, value]) => [
-        key,
-        convertPriceDraft(
-          value,
-          activePriceCurrency,
-          nextCurrency,
-          safeUsdExchangeRate
-        ),
-      ])
-    ) as Record<LaneKey, string>
-    const nextFixedPrice = convertPriceDraft(
-      form.getValues('price') || '',
-      activePriceCurrency,
-      nextCurrency,
-      safeUsdExchangeRate
-    )
-
-    setInternalPriceCurrency(nextCurrency)
-    onPriceCurrencyChange?.(nextCurrency)
-    setPromptPrice(nextPromptPrice)
-    setLanePrices(nextLanePrices)
-    form.setValue('price', nextFixedPrice, {
-      shouldDirty: false,
-      shouldValidate: true,
-    })
-    syncLaneRatios(nextPromptPrice, nextLanePrices, laneEnabled, nextCurrency)
   }
 
   const handleLanePriceChange = (lane: LaneKey, value: string) => {
@@ -756,7 +655,6 @@ export function ModelPricingEditorPanel({
         promptPrice,
         lanePrices,
         laneEnabled,
-        activePriceCurrency,
         t
       ),
     [
@@ -766,7 +664,6 @@ export function ModelPricingEditorPanel({
       pricingMode,
       promptPrice,
       requestRuleExpr,
-      activePriceCurrency,
       t,
       watchedValues,
     ]
@@ -842,11 +739,7 @@ export function ModelPricingEditorPanel({
       return
     }
 
-    const fixedPrice = displayPriceToUsd(
-      values.price || '',
-      activePriceCurrency,
-      safeUsdExchangeRate
-    )
+    const fixedPrice = displayPrice(values.price || '')
     const data: ModelRatioData = {
       name: values.name.trim(),
       billingMode: pricingMode,
@@ -890,27 +783,6 @@ export function ModelPricingEditorPanel({
             </p>
           </div>
           <div className='flex shrink-0 items-center gap-2'>
-            <div
-              className='bg-muted flex rounded-lg p-0.5'
-              aria-label={t('Billing currency')}
-            >
-              {(['USD', 'CNY'] as PriceCurrency[]).map((currency) => (
-                <Button
-                  key={currency}
-                  type='button'
-                  size='sm'
-                  variant='ghost'
-                  className={cn(
-                    'h-7 px-2 text-xs',
-                    activePriceCurrency === currency &&
-                      'bg-background text-foreground shadow-sm'
-                  )}
-                  onClick={() => handlePriceCurrencyChange(currency)}
-                >
-                  {currency === 'CNY' ? t('CNY') : t('USD')}
-                </Button>
-              ))}
-            </div>
             <Badge variant={getModeBadgeVariant(pricingMode)}>
               {t(getModeLabel(pricingMode))}
             </Badge>
@@ -977,19 +849,11 @@ export function ModelPricingEditorPanel({
                       <FieldLabel>{t('Input price')}</FieldLabel>
                       <PriceInput
                         value={promptPrice}
-                        priceCurrency={activePriceCurrency}
-                        placeholder={convertPriceDraft(
-                          '3',
-                          'USD',
-                          activePriceCurrency,
-                          safeUsdExchangeRate
-                        )}
+                        placeholder={convertPriceDraft('3')}
                         onChange={handlePromptPriceChange}
                       />
                       <FieldDescription>
-                        {activePriceCurrency === 'CNY'
-                          ? t('CNY price per 1M input tokens.')
-                          : t('USD price per 1M input tokens.')}
+                        {t('CNY price per 1M input tokens.')}
                       </FieldDescription>
                     </Field>
 
@@ -1006,8 +870,6 @@ export function ModelPricingEditorPanel({
                             description={t(lane.descriptionKey)}
                             placeholder={lane.placeholder}
                             value={lanePrices[lane.key]}
-                            priceCurrency={activePriceCurrency}
-                            usdExchangeRate={safeUsdExchangeRate}
                             enabled={laneEnabled[lane.key]}
                             disabled={disabled}
                             onEnabledChange={(checked) =>
@@ -1036,16 +898,11 @@ export function ModelPricingEditorPanel({
                         <FormControl>
                           <InputGroup>
                             <InputGroupAddon>
-                              {getPriceCurrencySymbol(activePriceCurrency)}
+                              {getPriceCurrencySymbol()}
                             </InputGroupAddon>
                             <InputGroupInput
                               inputMode='decimal'
-                              placeholder={convertPriceDraft(
-                                '0.01',
-                                'USD',
-                                activePriceCurrency,
-                                safeUsdExchangeRate
-                              )}
+                              placeholder={convertPriceDraft('0.01')}
                               {...field}
                               onChange={(event) => {
                                 const value = event.target.value
@@ -1060,11 +917,7 @@ export function ModelPricingEditorPanel({
                           </InputGroup>
                         </FormControl>
                         <FormDescription>
-                          {activePriceCurrency === 'CNY'
-                            ? t('Cost in CNY per request.')
-                            : t(
-                                'Cost in USD per request, regardless of tokens used.'
-                              )}
+                          {t('Cost in CNY per request.')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1157,12 +1010,11 @@ export function ModelPricingEditorPanel({
 
 function PriceInput(props: {
   value: string
-  priceCurrency: PriceCurrency
   placeholder?: string
   disabled?: boolean
   onChange: (value: string) => void
 }) {
-  const symbol = getPriceCurrencySymbol(props.priceCurrency)
+  const symbol = getPriceCurrencySymbol()
   return (
     <InputGroup>
       <InputGroupAddon>{symbol}</InputGroupAddon>
@@ -1183,8 +1035,6 @@ function PriceLane(props: {
   description: string
   placeholder: string
   value: string
-  priceCurrency: PriceCurrency
-  usdExchangeRate: number
   enabled: boolean
   disabled?: boolean
   onEnabledChange: (checked: boolean) => void
@@ -1215,21 +1065,13 @@ function PriceLane(props: {
       </div>
       <PriceInput
         value={props.value}
-        priceCurrency={props.priceCurrency}
-        placeholder={convertPriceDraft(
-          props.placeholder,
-          'USD',
-          props.priceCurrency,
-          props.usdExchangeRate
-        )}
+        placeholder={convertPriceDraft(props.placeholder)}
         disabled={effectiveDisabled}
         onChange={props.onChange}
       />
       <FieldDescription>
         {props.enabled
-          ? props.priceCurrency === 'CNY'
-            ? t('CNY price per 1M tokens.')
-            : t('USD price per 1M tokens.')
+          ? t('CNY price per 1M tokens.')
           : t('Disabled lanes are omitted on save.')}
       </FieldDescription>
     </Field>

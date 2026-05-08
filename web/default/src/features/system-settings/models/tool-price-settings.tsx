@@ -19,14 +19,14 @@ import { useUpdateOption } from '../hooks/use-update-option'
 const OPTION_KEY = 'tool_price_setting.prices'
 
 const DEFAULT_PRICES: Record<string, number> = {
-  web_search: 10.0,
-  web_search_preview: 10.0,
-  'web_search_preview:gpt-4o*': 25.0,
-  'web_search_preview:gpt-4.1*': 25.0,
-  'web_search_preview:gpt-4o-mini*': 25.0,
-  'web_search_preview:gpt-4.1-mini*': 25.0,
-  file_search: 2.5,
-  google_search: 14.0,
+  web_search: 73.0,
+  web_search_preview: 73.0,
+  'web_search_preview:gpt-4o*': 182.5,
+  'web_search_preview:gpt-4.1*': 182.5,
+  'web_search_preview:gpt-4o-mini*': 182.5,
+  'web_search_preview:gpt-4.1-mini*': 182.5,
+  file_search: 18.25,
+  google_search: 102.2,
 }
 
 type ToolPriceRow = {
@@ -186,7 +186,7 @@ export const ToolPriceSettings = memo(function ToolPriceSettings({
         <AlertDescription className='space-y-1 text-sm'>
           <div>
             {t(
-              'Configure per-tool unit prices ($/1K calls). Per-request models do not incur additional tool fees.'
+              'Configure per-tool unit prices (¥/1K calls). Per-request models do not incur additional tool fees.'
             )}
           </div>
           <div>
@@ -249,7 +249,7 @@ export const ToolPriceSettings = memo(function ToolPriceSettings({
               <TableRow>
                 <TableHead>{t('Tool identifier')}</TableHead>
                 <TableHead className='w-[200px]'>
-                  {t('Price ($/1K calls)')}
+                  {t('Price (¥/1K calls)')}
                 </TableHead>
                 <TableHead className='w-[80px] text-right'>
                   {t('Actions')}

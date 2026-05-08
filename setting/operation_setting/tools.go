@@ -9,7 +9,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Tool call prices ($/1K calls, admin-configurable)
+// Tool call prices (CNY/1K calls, admin-configurable)
 // DB key: tool_price_setting.prices
 //
 // Key format:
@@ -20,17 +20,17 @@ import (
 // ---------------------------------------------------------------------------
 
 var defaultToolPrices = map[string]float64{
-	"web_search":         10.0, // OpenAI web search (all models) / Claude web search
-	"web_search_preview": 10.0, // OpenAI web search preview (default: reasoning models)
-	"file_search":        2.5,  // OpenAI file search (Responses API)
-	"google_search":      14.0, // Gemini Grounding with Google Search
+	"web_search":         73.0,  // OpenAI web search (all models) / Claude web search
+	"web_search_preview": 73.0,  // OpenAI web search preview (default: reasoning models)
+	"file_search":        18.25, // OpenAI file search (Responses API)
+	"google_search":      102.2, // Gemini Grounding with Google Search
 }
 
 var defaultToolPriceOverrides = map[string]float64{
-	"web_search_preview:gpt-4o*":       25.0, // non-reasoning models
-	"web_search_preview:gpt-4.1*":      25.0,
-	"web_search_preview:gpt-4o-mini*":  25.0,
-	"web_search_preview:gpt-4.1-mini*": 25.0,
+	"web_search_preview:gpt-4o*":       182.5, // non-reasoning models
+	"web_search_preview:gpt-4.1*":      182.5,
+	"web_search_preview:gpt-4o-mini*":  182.5,
+	"web_search_preview:gpt-4.1-mini*": 182.5,
 }
 
 // ToolPriceSetting is managed by config.GlobalConfig.Register.
@@ -114,7 +114,7 @@ func RebuildToolPriceIndex() {
 	currentIndex.Store(idx)
 }
 
-// GetToolPriceForModel returns the price ($/1K calls) for a tool given a model name.
+// GetToolPriceForModel returns the price (CNY/1K calls) for a tool given a model name.
 // Lookup: longest prefix match → tool default → 0.
 func GetToolPriceForModel(toolName, modelName string) float64 {
 	idx := currentIndex.Load()
@@ -149,15 +149,15 @@ func GetToolPrice(toolName string) float64 {
 // ---------------------------------------------------------------------------
 
 const (
-	GPTImage1Low1024x1024    = 0.011
-	GPTImage1Low1024x1536    = 0.016
-	GPTImage1Low1536x1024    = 0.016
-	GPTImage1Medium1024x1024 = 0.042
-	GPTImage1Medium1024x1536 = 0.063
-	GPTImage1Medium1536x1024 = 0.063
-	GPTImage1High1024x1024   = 0.167
-	GPTImage1High1024x1536   = 0.25
-	GPTImage1High1536x1024   = 0.25
+	GPTImage1Low1024x1024    = 0.0803
+	GPTImage1Low1024x1536    = 0.1168
+	GPTImage1Low1536x1024    = 0.1168
+	GPTImage1Medium1024x1024 = 0.3066
+	GPTImage1Medium1024x1536 = 0.4599
+	GPTImage1Medium1536x1024 = 0.4599
+	GPTImage1High1024x1024   = 1.2191
+	GPTImage1High1024x1536   = 1.825
+	GPTImage1High1536x1024   = 1.825
 )
 
 func GetGPTImage1PriceOnceCall(quality string, size string) float64 {
@@ -193,12 +193,12 @@ func GetGPTImage1PriceOnceCall(quality string, size string) float64 {
 // ---------------------------------------------------------------------------
 
 const (
-	Gemini25FlashPreviewInputAudioPrice     = 1.00
-	Gemini25FlashProductionInputAudioPrice  = 1.00
-	Gemini25FlashLitePreviewInputAudioPrice = 0.50
-	Gemini25FlashNativeAudioInputAudioPrice = 3.00
-	Gemini20FlashInputAudioPrice            = 0.70
-	GeminiRoboticsER15InputAudioPrice       = 1.00
+	Gemini25FlashPreviewInputAudioPrice     = 7.30
+	Gemini25FlashProductionInputAudioPrice  = 7.30
+	Gemini25FlashLitePreviewInputAudioPrice = 3.65
+	Gemini25FlashNativeAudioInputAudioPrice = 21.90
+	Gemini20FlashInputAudioPrice            = 5.11
+	GeminiRoboticsER15InputAudioPrice       = 7.30
 )
 
 func GetGeminiInputAudioPricePerMillionTokens(modelName string) float64 {

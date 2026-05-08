@@ -11,7 +11,6 @@ import { resetModelRatios } from '../api'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { GroupRatioForm } from './group-ratio-form'
-import type { PriceCurrency } from './model-pricing-sheet'
 import { ModelRatioForm } from './model-ratio-form'
 import { ToolPriceSettings } from './tool-price-settings'
 import { UpstreamRatioSync } from './upstream-ratio-sync'
@@ -189,8 +188,6 @@ type RatioSettingsCardProps = {
   titleKey?: string
   descriptionKey?: string
   visibleTabs?: RatioTabId[]
-  usdExchangeRate?: number
-  defaultPriceCurrency?: PriceCurrency
 }
 
 export function RatioSettingsCard({
@@ -200,8 +197,6 @@ export function RatioSettingsCard({
   titleKey = 'Pricing Ratios',
   descriptionKey = 'Configure model, caching, and group ratios used for billing',
   visibleTabs = ['models', 'groups', 'tool-prices', 'upstream-sync'],
-  usdExchangeRate,
-  defaultPriceCurrency = 'USD',
 }: RatioSettingsCardProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -450,8 +445,6 @@ export function RatioSettingsCard({
           onReset={handleResetRatios}
           isSaving={updateOption.isPending}
           isResetting={resetMutation.isPending}
-          usdExchangeRate={usdExchangeRate}
-          defaultPriceCurrency={defaultPriceCurrency}
         />
       )
     }

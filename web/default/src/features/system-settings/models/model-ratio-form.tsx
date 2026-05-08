@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import type { PriceCurrency } from './model-pricing-sheet'
 import { ModelRatioVisualEditor } from './model-ratio-visual-editor'
 
 type ModelFormValues = {
@@ -37,8 +36,6 @@ type ModelRatioFormProps = {
   onReset: () => void
   isSaving: boolean
   isResetting: boolean
-  usdExchangeRate?: number
-  defaultPriceCurrency?: PriceCurrency
 }
 
 export const ModelRatioForm = memo(function ModelRatioForm({
@@ -47,8 +44,6 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   onReset,
   isSaving,
   isResetting,
-  usdExchangeRate,
-  defaultPriceCurrency,
 }: ModelRatioFormProps) {
   const { t } = useTranslation()
   const [editMode, setEditMode] = useState<'visual' | 'json'>('visual')
@@ -99,8 +94,6 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               audioCompletionRatio={form.watch('AudioCompletionRatio')}
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
-              usdExchangeRate={usdExchangeRate}
-              defaultPriceCurrency={defaultPriceCurrency}
               onChange={(field, value) => {
                 const fieldMap: Record<string, keyof ModelFormValues> = {
                   'billing_setting.billing_mode': 'BillingMode',
@@ -164,7 +157,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
                   </FormControl>
                   <FormDescription>
                     {t(
-                      'JSON map of model → USD cost per request. Takes precedence over ratio based billing.'
+                      'JSON map of model → CNY cost per request. Takes precedence over ratio based billing.'
                     )}
                   </FormDescription>
                   <FormMessage />
