@@ -19,8 +19,10 @@ import (
 )
 
 const (
-	factoryAccountsPath = "/api/internal/new-api/accounts"
-	factoryBindPath     = "/api/internal/new-api/token-bind"
+	factoryAccountsPath      = "/api/internal/new-api/accounts"
+	factoryBindPath          = "/api/internal/new-api/token-bind"
+	defaultFactoryBaseURL    = "http://127.0.0.1:19001"
+	defaultFactorySyncSecret = "dev-new-api-sync-secret"
 )
 
 type FactoryAccount struct {
@@ -91,8 +93,8 @@ type factoryEnvelope[T any] struct {
 }
 
 func GetFactoryIntegrationStatus() map[string]any {
-	baseURL := strings.TrimSpace(os.Getenv("AIGC_FACTORY_BASE_URL"))
-	secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET"))
+	baseURL := getFactoryBaseURL()
+	secret := getFactorySyncSecret()
 	providerIds := parseFactoryProviderIds(os.Getenv("AIGC_FACTORY_PROVIDER_IDS"))
 	return map[string]any{
 		"configured":   baseURL != "" && secret != "",
@@ -111,7 +113,7 @@ func ListFactoryAccounts(ctx context.Context, req FactoryAccountListRequest) (*F
 	body := factoryAccountsRequest{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Keyword: strings.TrimSpace(req.Keyword),
+		Keyword:  strings.TrimSpace(req.Keyword),
 	}
 	accounts, err := fetchFactoryAccounts(ctx, body)
 	if err != nil {
@@ -295,6 +297,9 @@ func ensureFactoryUserAndToken(account FactoryAccount) (*model.User, *model.Toke
 	if binding, err := model.GetFactoryAccountBindingByFactoryUserId(account.Id); err == nil {
 		user, token, reuseErr := reuseBoundUserAndToken(binding)
 		if reuseErr == nil {
+			if err := ensureFactoryTokenName(token, account); err != nil {
+				return nil, nil, err
+			}
 			return user, token, nil
 		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -304,7 +309,7 @@ func ensureFactoryUserAndToken(account FactoryAccount) (*model.User, *model.Toke
 	if err != nil {
 		return nil, nil, err
 	}
-	token, err := ensureFactoryToken(user)
+	token, err := ensureFactoryToken(user, account)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -376,11 +381,25 @@ func ensureFactoryUser(account FactoryAccount) (*model.User, error) {
 	return &user, nil
 }
 
-func ensureFactoryToken(user *model.User) (*model.Token, error) {
+func ensureFactoryToken(user *model.User, account FactoryAccount) (*model.Token, error) {
+	tokenName := factoryTokenName(account)
 	var token model.Token
-	err := model.DB.Where("user_id = ? AND name = ?", user.Id, "Creative Factory").First(&token).Error
+	err := model.DB.Where("user_id = ? AND name = ?", user.Id, tokenName).First(&token).Error
 	if err == nil {
 		if err := ensureFactoryTokenUsable(&token, user.Group); err != nil {
+			return nil, err
+		}
+		return &token, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	err = model.DB.Where("user_id = ? AND name = ?", user.Id, "Creative Factory").First(&token).Error
+	if err == nil {
+		if err := ensureFactoryTokenUsable(&token, user.Group); err != nil {
+			return nil, err
+		}
+		if err := ensureFactoryTokenName(&token, account); err != nil {
 			return nil, err
 		}
 		return &token, nil
@@ -395,7 +414,7 @@ func ensureFactoryToken(user *model.User) (*model.Token, error) {
 	now := common.GetTimestamp()
 	token = model.Token{
 		UserId:         user.Id,
-		Name:           "Creative Factory",
+		Name:           tokenName,
 		Key:            key,
 		Status:         common.TokenStatusEnabled,
 		CreatedTime:    now,
@@ -409,6 +428,15 @@ func ensureFactoryToken(user *model.User) (*model.Token, error) {
 		return nil, err
 	}
 	return &token, nil
+}
+
+func ensureFactoryTokenName(token *model.Token, account FactoryAccount) error {
+	tokenName := factoryTokenName(account)
+	if token.Name == tokenName {
+		return nil
+	}
+	token.Name = tokenName
+	return token.Update()
 }
 
 func ensureFactoryTokenUsable(token *model.Token, group string) error {
@@ -454,16 +482,38 @@ func attachFactoryBindings(accounts []FactoryAccount) error {
 }
 
 func factoryConfig() (string, string, error) {
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("AIGC_FACTORY_BASE_URL")), "/")
-	secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET"))
+	baseURL := getFactoryBaseURL()
+	secret := getFactorySyncSecret()
 	if baseURL == "" || secret == "" {
 		return "", "", errors.New("请配置 AIGC_FACTORY_BASE_URL 和 AIGC_FACTORY_SYNC_SECRET")
 	}
 	return baseURL, secret, nil
 }
 
+func getFactoryBaseURL() string {
+	baseURL := strings.TrimSpace(os.Getenv("AIGC_FACTORY_BASE_URL"))
+	if baseURL == "" {
+		baseURL = defaultFactoryBaseURL
+	}
+	return strings.TrimRight(baseURL, "/")
+}
+
+func getFactorySyncSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET")); secret != "" {
+		return secret
+	}
+	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_NEW_API_SYNC_SECRET")); secret != "" {
+		return secret
+	}
+	return defaultFactorySyncSecret
+}
+
 func factoryUsername(factoryUserId int) string {
 	return fmt.Sprintf("cf_%d", factoryUserId)
+}
+
+func factoryTokenName(account FactoryAccount) string {
+	return truncateRunes(firstNonEmpty(account.Username, account.DisplayName, factoryUsername(account.Id)), 64)
 }
 
 func withSkPrefix(key string) string {

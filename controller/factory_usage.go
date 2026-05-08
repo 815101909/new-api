@@ -21,13 +21,31 @@ type factoryUsageBindingPayload struct {
 	NewApiUserId    int    `json:"new_api_user_id"`
 	NewApiUsername  string `json:"new_api_username"`
 	TokenId         int    `json:"token_id"`
+	TokenName       string `json:"token_name"`
 }
+
+type factoryUsageTarget struct {
+	TokenId int
+	Bound   bool
+	Binding *factoryUsageBindingPayload
+}
+
+type factoryUsageBindTokenRequest struct {
+	FactoryUserId   int    `json:"factory_user_id"`
+	FactoryUsername string `json:"factory_username"`
+	ApiKey          string `json:"api_key"`
+}
+
+const defaultFactoryUsageSyncSecret = "dev-new-api-sync-secret"
 
 func getFactoryUsageSyncSecret() string {
 	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_NEW_API_SYNC_SECRET")); secret != "" {
 		return secret
 	}
-	return strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET"))
+	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET")); secret != "" {
+		return secret
+	}
+	return defaultFactoryUsageSyncSecret
 }
 
 func assertFactoryUsageSecret(c *gin.Context) bool {
@@ -51,6 +69,17 @@ func parseFactoryUsageTimestamp(value string) int64 {
 	return timestamp
 }
 
+func normalizeFactoryUsageApiKey(value string) string {
+	apiKey := strings.TrimSpace(value)
+	apiKey = strings.TrimPrefix(apiKey, "Bearer ")
+	apiKey = strings.TrimPrefix(apiKey, "bearer ")
+	apiKey = strings.TrimPrefix(apiKey, "sk-")
+	if strings.Contains(apiKey, "-") {
+		return strings.Split(apiKey, "-")[0]
+	}
+	return apiKey
+}
+
 func buildFactoryUsageBindingPayload(binding *model.FactoryAccountBinding) factoryUsageBindingPayload {
 	if binding == nil {
 		return factoryUsageBindingPayload{}
@@ -61,10 +90,19 @@ func buildFactoryUsageBindingPayload(binding *model.FactoryAccountBinding) facto
 		NewApiUserId:    binding.NewApiUserId,
 		NewApiUsername:  binding.NewApiUsername,
 		TokenId:         binding.TokenId,
+		TokenName:       getFactoryUsageTokenName(binding.TokenId),
 	}
 }
 
-func getFactoryUsageBinding(c *gin.Context) (*model.FactoryAccountBinding, bool) {
+func getFactoryUsageTokenName(tokenId int) string {
+	token, err := model.GetTokenById(tokenId)
+	if err != nil || token == nil {
+		return ""
+	}
+	return token.Name
+}
+
+func getFactoryUsageTarget(c *gin.Context) (*factoryUsageTarget, bool) {
 	factoryUserId, _ := strconv.Atoi(c.Query("factory_user_id"))
 	if factoryUserId <= 0 {
 		common.ApiErrorMsg(c, "factory_user_id 不能为空")
@@ -72,16 +110,109 @@ func getFactoryUsageBinding(c *gin.Context) (*model.FactoryAccountBinding, bool)
 	}
 	binding, err := model.GetFactoryAccountBindingByFactoryUserId(factoryUserId)
 	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			common.ApiError(c, err)
+			return nil, false
+		}
+		return getFactoryUsageTargetByTokenName(c, factoryUserId)
+	}
+	if binding.TokenId <= 0 {
+		return getFactoryUsageTargetByTokenName(c, factoryUserId)
+	}
+	payload := buildFactoryUsageBindingPayload(binding)
+	return &factoryUsageTarget{
+		TokenId: binding.TokenId,
+		Bound:   true,
+		Binding: &payload,
+	}, true
+}
+
+func getFactoryUsageTargetByTokenName(c *gin.Context, factoryUserId int) (*factoryUsageTarget, bool) {
+	factoryUsername := strings.TrimSpace(c.Query("factory_username"))
+	if factoryUsername == "" {
+		return nil, true
+	}
+	token, err := model.GetTokenByName(factoryUsername)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, true
 		}
 		common.ApiError(c, err)
 		return nil, false
 	}
-	if binding.TokenId <= 0 {
-		return nil, true
+	newApiUsername, _ := model.GetUsernameById(token.UserId, false)
+	payload := factoryUsageBindingPayload{
+		FactoryUserId:   factoryUserId,
+		FactoryUsername: factoryUsername,
+		NewApiUserId:    token.UserId,
+		NewApiUsername:  newApiUsername,
+		TokenId:         token.Id,
+		TokenName:       token.Name,
 	}
-	return binding, true
+	return &factoryUsageTarget{
+		TokenId: token.Id,
+		Bound:   true,
+		Binding: &payload,
+	}, true
+}
+
+func BindFactoryUsageToken(c *gin.Context) {
+	if !assertFactoryUsageSecret(c) {
+		return
+	}
+
+	req := factoryUsageBindTokenRequest{}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	factoryUserId := req.FactoryUserId
+	factoryUsername := strings.TrimSpace(req.FactoryUsername)
+	apiKey := normalizeFactoryUsageApiKey(req.ApiKey)
+	if factoryUserId <= 0 || factoryUsername == "" {
+		common.ApiErrorMsg(c, "创作工厂账号信息不能为空")
+		return
+	}
+	if apiKey == "" {
+		common.ApiErrorMsg(c, "New API 令牌不能为空")
+		return
+	}
+	token, err := model.ValidateUserToken(apiKey)
+	if err != nil || token == nil {
+		common.ApiErrorMsg(c, "New API 令牌无效或不可用")
+		return
+	}
+	newApiUsername, err := model.GetUsernameById(token.UserId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if token.Name != factoryUsername {
+		token.Name = factoryUsername
+		if err := token.Update(); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
+	binding := &model.FactoryAccountBinding{
+		FactoryUserId:      factoryUserId,
+		FactoryUsername:    factoryUsername,
+		FactoryDisplayName: factoryUsername,
+		FactoryStatus:      1,
+		NewApiUserId:       token.UserId,
+		NewApiUsername:     newApiUsername,
+		TokenId:            token.Id,
+		Status:             model.FactoryAccountBindingStatusEnabled,
+		LastSyncedAt:       common.GetTimestamp(),
+	}
+	if err := model.SaveFactoryAccountBinding(binding); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"bound":   true,
+		"binding": buildFactoryUsageBindingPayload(binding),
+	})
 }
 
 func GetFactoryUsageLogs(c *gin.Context) {
@@ -90,11 +221,11 @@ func GetFactoryUsageLogs(c *gin.Context) {
 	}
 
 	pageInfo := common.GetPageQuery(c)
-	binding, ok := getFactoryUsageBinding(c)
+	target, ok := getFactoryUsageTarget(c)
 	if !ok {
 		return
 	}
-	if binding == nil {
+	if target == nil || !target.Bound {
 		pageInfo.SetTotal(0)
 		pageInfo.SetItems([]*model.Log{})
 		common.ApiSuccess(c, gin.H{
@@ -117,7 +248,7 @@ func GetFactoryUsageLogs(c *gin.Context) {
 	group := strings.TrimSpace(c.Query("group"))
 	requestId := strings.TrimSpace(c.Query("request_id"))
 	logs, total, err := model.GetLogsByTokenId(
-		binding.TokenId,
+		target.TokenId,
 		logType,
 		startTimestamp,
 		endTimestamp,
@@ -135,7 +266,7 @@ func GetFactoryUsageLogs(c *gin.Context) {
 	pageInfo.SetItems(logs)
 	common.ApiSuccess(c, gin.H{
 		"bound":             true,
-		"binding":           buildFactoryUsageBindingPayload(binding),
+		"binding":           target.Binding,
 		"quota_per_unit":    common.QuotaPerUnit,
 		"usd_exchange_rate": operation_setting.USDExchangeRate,
 		"page":              pageInfo,
@@ -147,11 +278,11 @@ func GetFactoryUsageStat(c *gin.Context) {
 		return
 	}
 
-	binding, ok := getFactoryUsageBinding(c)
+	target, ok := getFactoryUsageTarget(c)
 	if !ok {
 		return
 	}
-	if binding == nil {
+	if target == nil || !target.Bound {
 		common.ApiSuccess(c, gin.H{
 			"bound":             false,
 			"binding":           nil,
@@ -172,7 +303,7 @@ func GetFactoryUsageStat(c *gin.Context) {
 	modelName := strings.TrimSpace(c.Query("model_name"))
 	group := strings.TrimSpace(c.Query("group"))
 	requestId := strings.TrimSpace(c.Query("request_id"))
-	stat, err := model.SumUsedQuotaByTokenId(binding.TokenId, startTimestamp, endTimestamp, modelName, group, requestId)
+	stat, err := model.SumUsedQuotaByTokenId(target.TokenId, startTimestamp, endTimestamp, modelName, group, requestId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -180,7 +311,7 @@ func GetFactoryUsageStat(c *gin.Context) {
 	amountUsd := float64(stat.Quota) / common.QuotaPerUnit
 	common.ApiSuccess(c, gin.H{
 		"bound":             true,
-		"binding":           buildFactoryUsageBindingPayload(binding),
+		"binding":           target.Binding,
 		"quota":             stat.Quota,
 		"rpm":               stat.Rpm,
 		"tpm":               stat.Tpm,

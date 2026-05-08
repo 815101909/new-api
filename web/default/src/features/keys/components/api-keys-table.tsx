@@ -128,7 +128,7 @@ function ApiKeysMobileList({
                   {apiKey.name}
                 </div>
                 <div className='text-muted-foreground text-[11px]'>
-                  {t('API Key')}
+                  {t('Username')}
                 </div>
               </div>
               {statusConfig && (
@@ -294,7 +294,7 @@ export function ApiKeysTable() {
       )}
       skeletonKeyPrefix='api-keys-skeleton'
       toolbarProps={{
-        searchPlaceholder: t('Filter by name or key...'),
+        searchPlaceholder: t('Filter by username'),
         filters: [
           {
             columnId: 'status',

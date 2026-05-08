@@ -8,7 +8,7 @@ import { type ApiKeyFormData, type ApiKey } from '../types'
 // ============================================================================
 
 export const apiKeyFormSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Username is required'),
   remain_quota_dollars: z.number().min(0).optional(),
   expired_time: z.date().optional(),
   unlimited_quota: z.boolean(),

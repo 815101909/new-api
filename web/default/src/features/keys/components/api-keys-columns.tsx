@@ -107,14 +107,14 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
     {
       accessorKey: 'name',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t('Name')} />
+        <DataTableColumnHeader column={column} title={t('Username')} />
       ),
       cell: ({ row }) => (
         <div className='max-w-[200px] truncate font-medium'>
           {row.getValue('name')}
         </div>
       ),
-      meta: { label: t('Name'), mobileTitle: true },
+      meta: { label: t('Username'), mobileTitle: true },
     },
     {
       accessorKey: 'status',

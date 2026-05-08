@@ -283,10 +283,15 @@ export function ApiKeysMutateDrawer({
                 name='name'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Name')}</FormLabel>
+                    <FormLabel>{t('Username')}</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder={t('Enter a name')} />
+                      <Input {...field} placeholder={t('Enter username')} />
                     </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Use the Creative Factory username here when this key is used by Creative Factory.'
+                      )}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

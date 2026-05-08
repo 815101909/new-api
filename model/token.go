@@ -252,6 +252,16 @@ func GetTokenById(id int) (*Token, error) {
 	return &token, err
 }
 
+func GetTokenByName(name string) (*Token, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("name 为空！")
+	}
+	token := Token{}
+	err := DB.Where("name = ?", name).Order("id desc").First(&token).Error
+	return &token, err
+}
+
 func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 	defer func() {
 		// Update Redis cache asynchronously on successful DB read
