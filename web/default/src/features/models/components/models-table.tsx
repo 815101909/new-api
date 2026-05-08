@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import {
   getCoreRowModel,
@@ -10,8 +10,11 @@ import {
 import { useMediaQuery } from '@/hooks'
 import { useTranslation } from 'react-i18next'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { Loader2, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { DataTablePage } from '@/components/data-table'
-import { getModels, searchModels, getVendors } from '../api'
+import { getModels, searchModels, getVendors, syncUpstream } from '../api'
 import {
   DEFAULT_PAGE_SIZE,
   getModelStatusOptions,
@@ -26,8 +29,10 @@ const route = getRouteApi('/_authenticated/models/$section')
 
 export function ModelsTable() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const { selectedVendor } = useModels()
   const isMobile = useMediaQuery('(max-width: 640px)')
+  const [isImportingDomestic, setIsImportingDomestic] = useState(false)
 
   // Table state
   const [sorting, setSorting] = useState<SortingState>([])
@@ -153,6 +158,44 @@ export function ModelsTable() {
   const models = data?.data?.items || []
   const totalCount = data?.data?.total || 0
   const vendorCounts = data?.data?.vendor_counts
+  const hasActiveFilters = Boolean(
+    globalFilter?.trim() ||
+      activeVendorFilter ||
+      (statusFilter.length > 0 && !statusFilter.includes('all')) ||
+      (syncFilter.length > 0 && !syncFilter.includes('all'))
+  )
+
+  const handleImportDomesticDefaults = async () => {
+    setIsImportingDomestic(true)
+    try {
+      const response = await syncUpstream({ locale: 'zh', source: 'domestic' })
+      if (!response.success) {
+        toast.error(response.message || t('Sync failed'))
+        return
+      }
+
+      const createdModels = response.data?.created_models || 0
+      const createdVendors = response.data?.created_vendors || 0
+
+      if (createdModels === 0 && createdVendors === 0) {
+        toast.info(t('No domestic defaults were imported.'))
+      } else {
+        toast.success(
+          t('Imported {{models}} domestic models and {{vendors}} vendors.', {
+            models: createdModels,
+            vendors: createdVendors,
+          })
+        )
+      }
+
+      queryClient.invalidateQueries({ queryKey: modelsQueryKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: vendorsQueryKeys.lists() })
+    } catch (error: unknown) {
+      toast.error((error as Error)?.message || t('Sync failed'))
+    } finally {
+      setIsImportingDomestic(false)
+    }
+  }
 
   // Columns configuration
   const columns = useModelsColumns(vendors)
@@ -209,8 +252,24 @@ export function ModelsTable() {
       isFetching={isFetching}
       emptyTitle={t('No Models Found')}
       emptyDescription={t(
-        'No models available. Create your first model to get started.'
+        'No models available. Import domestic defaults or create your first model.'
       )}
+      emptyAction={
+        !hasActiveFilters && totalCount === 0 ? (
+          <Button
+            size='sm'
+            onClick={handleImportDomesticDefaults}
+            disabled={isImportingDomestic}
+          >
+            {isImportingDomestic ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : (
+              <Sparkles className='h-4 w-4' />
+            )}
+            {t('Import Domestic Defaults')}
+          </Button>
+        ) : undefined
+      }
       skeletonKeyPrefix='model-skeleton'
       applyHeaderSize
       toolbarProps={{
