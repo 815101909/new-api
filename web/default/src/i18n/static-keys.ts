@@ -208,9 +208,17 @@ export const STATIC_I18N_KEYS = [
   'English',
   'Japanese',
   'Official Repository',
+  'Domestic Model Defaults',
   'Configuration File',
   'Sync from the public upstream metadata repository.',
+  'Import curated domestic providers and models for a fresh installation.',
   'Upload or reference a local configuration file.',
+  'Imported {{models}} domestic models and {{vendors}} vendors.',
+  'No domestic defaults were imported.',
+  'Import Domestic Channel Templates',
+  'Domestic channel templates imported: {{created}} created, {{updated}} updated, {{models}} models added.',
+  'No domestic channel templates were imported.',
+  'Failed to import domestic channel templates',
 
   // Subscription constants (dynamic labelKey)
   'years',

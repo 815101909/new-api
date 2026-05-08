@@ -228,6 +228,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/update_balance", controller.UpdateAllChannelsBalance)
 			channelRoute.GET("/update_balance/:id", controller.UpdateChannelBalance)
 			channelRoute.POST("/", controller.AddChannel)
+			channelRoute.POST("/import_domestic_defaults", controller.ImportDomesticDefaultChannels)
 			channelRoute.PUT("/", controller.UpdateChannel)
 			channelRoute.DELETE("/disabled", controller.DeleteDisabledChannel)
 			channelRoute.POST("/tag/disabled", controller.DisableTagChannels)
@@ -315,6 +316,14 @@ func SetApiRouter(router *gin.Engine) {
 		groupRoute.Use(middleware.AdminAuth())
 		{
 			groupRoute.GET("/", controller.GetGroups)
+		}
+		factoryRoute := apiRouter.Group("/factory")
+		factoryRoute.Use(middleware.AdminAuth())
+		{
+			factoryRoute.GET("/status", controller.GetFactoryIntegrationStatus)
+			factoryRoute.GET("/accounts", controller.GetFactoryAccounts)
+			factoryRoute.GET("/bindings", controller.GetFactoryBindings)
+			factoryRoute.POST("/accounts/import", controller.ImportFactoryAccounts)
 		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")

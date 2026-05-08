@@ -112,6 +112,23 @@ export async function createChannel(
 }
 
 /**
+ * Import domestic channel templates and merge missing models into existing providers.
+ */
+export async function importDomesticDefaultChannels(): Promise<{
+  success: boolean
+  message?: string
+  data?: {
+    created_channels?: number
+    updated_channels?: number
+    skipped_channels?: number
+    added_models?: number
+  }
+}> {
+  const res = await api.post('/api/channel/import_domestic_defaults')
+  return res.data
+}
+
+/**
  * Update existing channel
  */
 export async function updateChannel(

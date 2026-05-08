@@ -11,8 +11,10 @@ import {
   SortAsc,
   RefreshCw,
   ArrowUpFromLine,
+  Download,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,11 +29,13 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
+  channelsQueryKeys,
   handleDeleteAllDisabled,
   handleFixAbilities,
   handleTestAllChannels,
   handleUpdateAllBalances,
 } from '../lib'
+import { importDomesticDefaultChannels } from '../api'
 import { useChannels } from './channels-provider'
 
 export function ChannelsPrimaryButtons() {
@@ -46,6 +50,7 @@ export function ChannelsPrimaryButtons() {
   } = useChannels()
   const queryClient = useQueryClient()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isImportingDomestic, setIsImportingDomestic] = useState(false)
 
   const handleTagModeToggle = (checked: boolean) => {
     localStorage.setItem('enable-tag-mode', String(checked))
@@ -55,6 +60,43 @@ export function ChannelsPrimaryButtons() {
   const handleIdSortToggle = (checked: boolean) => {
     localStorage.setItem('channels-id-sort', String(checked))
     setIdSort(checked)
+  }
+
+  const handleImportDomesticDefaults = async () => {
+    try {
+      setIsImportingDomestic(true)
+      const response = await importDomesticDefaultChannels()
+      if (!response.success) {
+        toast.error(
+          response.message || t('Failed to import domestic channel templates')
+        )
+        return
+      }
+
+      const created = response.data?.created_channels || 0
+      const updated = response.data?.updated_channels || 0
+      const models = response.data?.added_models || 0
+
+      if (created === 0 && updated === 0 && models === 0) {
+        toast.info(t('No domestic channel templates were imported.'))
+      } else {
+        toast.success(
+          t(
+            'Domestic channel templates imported: {{created}} created, {{updated}} updated, {{models}} models added.',
+            { created, updated, models }
+          )
+        )
+      }
+
+      queryClient.invalidateQueries({ queryKey: channelsQueryKeys.lists() })
+    } catch (error: unknown) {
+      toast.error(
+        (error as Error)?.message ||
+          t('Failed to import domestic channel templates')
+      )
+    } finally {
+      setIsImportingDomestic(false)
+    }
   }
 
   return (
@@ -118,6 +160,18 @@ export function ChannelsPrimaryButtons() {
             </DropdownMenuCheckboxItem>
 
             <DropdownMenuSeparator className='sm:hidden' />
+
+            <DropdownMenuItem
+              onClick={handleImportDomesticDefaults}
+              disabled={isImportingDomestic}
+            >
+              {t('Import Domestic Channel Templates')}
+              <DropdownMenuShortcut>
+                <Download className='h-4 w-4' />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
 
             <DropdownMenuItem
               onClick={() => {
