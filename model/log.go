@@ -37,6 +37,7 @@ type Log struct {
 	Ip               string `json:"ip" gorm:"index;default:''"`
 	RequestId        string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	Other            string `json:"other"`
+	DisplayUsername  string `json:"display_username,omitempty" gorm:"-"`
 }
 
 // don't use iota, avoid change log type value
@@ -63,6 +64,37 @@ func formatUserLogs(logs []*Log, startIdx int) {
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = startIdx + i + 1
+	}
+	enrichFactoryDisplayUsername(logs)
+}
+
+func enrichFactoryDisplayUsername(logs []*Log) {
+	tokenIds := make([]int, 0)
+	seenTokenIds := make(map[int]bool)
+	for _, log := range logs {
+		if log == nil || log.TokenId <= 0 || seenTokenIds[log.TokenId] {
+			continue
+		}
+		seenTokenIds[log.TokenId] = true
+		tokenIds = append(tokenIds, log.TokenId)
+	}
+	if len(tokenIds) == 0 {
+		return
+	}
+	bindingMap, err := GetFactoryAccountBindingMapByTokenIds(tokenIds)
+	if err != nil {
+		common.SysLog("failed to query factory account bindings for logs: " + err.Error())
+		return
+	}
+	for _, log := range logs {
+		if log == nil {
+			continue
+		}
+		binding := bindingMap[log.TokenId]
+		if binding == nil || binding.FactoryUsername == "" {
+			continue
+		}
+		log.DisplayUsername = binding.FactoryUsername
 	}
 }
 
@@ -412,6 +444,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		}
 	}
 
+	enrichFactoryDisplayUsername(logs)
 	return logs, total, err
 }
 

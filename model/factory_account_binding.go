@@ -57,6 +57,22 @@ func GetFactoryAccountBindingMap(factoryUserIds []int) (map[int]*FactoryAccountB
 	return result, nil
 }
 
+func GetFactoryAccountBindingMapByTokenIds(tokenIds []int) (map[int]*FactoryAccountBinding, error) {
+	result := make(map[int]*FactoryAccountBinding)
+	if len(tokenIds) == 0 {
+		return result, nil
+	}
+	var bindings []*FactoryAccountBinding
+	err := DB.Where("token_id IN ? AND status = ?", tokenIds, FactoryAccountBindingStatusEnabled).Find(&bindings).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, binding := range bindings {
+		result[binding.TokenId] = binding
+	}
+	return result, nil
+}
+
 func ListFactoryAccountBindings(offset int, limit int) ([]*FactoryAccountBinding, int64, error) {
 	var bindings []*FactoryAccountBinding
 	var total int64

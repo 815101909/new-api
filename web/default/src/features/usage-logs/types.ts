@@ -74,6 +74,11 @@ export interface ChannelAffinityInfo {
 }
 
 export interface LogOtherData {
+  source?: string
+  factory_user_id?: number | string
+  factory_username?: string
+  new_api_user_id?: number | string
+  new_api_username?: string
   admin_info?: {
     is_multi_key?: boolean
     multi_key_index?: number

@@ -36,6 +36,7 @@ import {
   parseAuditLine,
   decodeBillingExprB64,
   getTieredBillingSummary,
+  getUsageLogDisplayTokenName,
   hasAnyCacheTokens,
   isViolationFeeLog,
   getFirstResponseTimeColor,
@@ -385,6 +386,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const details = props.log.content ?? ''
   const other = parseLogOther(props.log.other)
+  const displayTokenName = getUsageLogDisplayTokenName(props.log)
   const typeConfig = getLogTypeConfig(props.log.type)
 
   const isViolation = isViolationFeeLog(other)
@@ -524,10 +526,10 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 <DetailRow label={t('Retry Chain')} value={channelChain} mono />
               )}
 
-              {props.log.token_name && (
+              {displayTokenName && (
                 <DetailRow
                   label={t('Token')}
-                  value={props.log.token_name}
+                  value={displayTokenName}
                   mono
                 />
               )}

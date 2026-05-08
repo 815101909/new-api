@@ -331,7 +331,16 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		return
 	}
 
+	factoryUserId := req.FactoryUserId
 	factoryUsername := strings.TrimSpace(req.FactoryUsername)
+	if binding != nil {
+		if binding.FactoryUserId > 0 {
+			factoryUserId = binding.FactoryUserId
+		}
+		if strings.TrimSpace(binding.FactoryUsername) != "" {
+			factoryUsername = strings.TrimSpace(binding.FactoryUsername)
+		}
+	}
 	content := fmt.Sprintf(
 		"创作工厂令牌充值，创作工厂账号：%s，充值金额：¥%.2f，到账金额：¥%.2f",
 		factoryUsername,
@@ -343,6 +352,10 @@ func TopupFactoryUsageToken(c *gin.Context) {
 	}
 	audit := map[string]interface{}{
 		"source":            "aigc_factory",
+		"factory_user_id":   factoryUserId,
+		"factory_username":  factoryUsername,
+		"new_api_user_id":   token.UserId,
+		"new_api_username":  newApiUsername,
 		"amount_cny":        req.AmountCny,
 		"amount_usd":        req.AmountCny,
 		"quota":             quota,
@@ -351,7 +364,7 @@ func TopupFactoryUsageToken(c *gin.Context) {
 	}
 	log := &model.Log{
 		UserId:    token.UserId,
-		Username:  newApiUsername,
+		Username:  factoryUsername,
 		CreatedAt: common.GetTimestamp(),
 		Type:      model.LogTypeTopup,
 		Content:   content,
@@ -367,7 +380,7 @@ func TopupFactoryUsageToken(c *gin.Context) {
 	}
 
 	payload := factoryUsageBindingPayload{
-		FactoryUserId:   req.FactoryUserId,
+		FactoryUserId:   factoryUserId,
 		FactoryUsername: factoryUsername,
 		NewApiUserId:    token.UserId,
 		NewApiUsername:  newApiUsername,
@@ -378,10 +391,6 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		UsedQuota:       token.UsedQuota,
 		TotalQuota:      token.RemainQuota + token.UsedQuota,
 		UnlimitedQuota:  token.UnlimitedQuota,
-	}
-	if binding != nil {
-		payload.FactoryUsername = binding.FactoryUsername
-		payload.FactoryUserId = binding.FactoryUserId
 	}
 	common.ApiSuccess(c, gin.H{
 		"bound":             true,

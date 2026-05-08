@@ -25,6 +25,8 @@ import {
   getFirstResponseTimeColor,
   getResponseTimeColor,
   getTieredBillingSummary,
+  getUsageLogDisplayTokenName,
+  getUsageLogDisplayUsername,
   hasAnyCacheTokens,
   parseLogOther,
   isViolationFeeLog,
@@ -385,8 +387,9 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
           const { sensitiveVisible, setSelectedUserId, setUserInfoDialogOpen } =
             useUsageLogsContext()
           const log = row.original
+          const displayUsername = getUsageLogDisplayUsername(log)
 
-          if (!log.username) return null
+          if (!displayUsername) return null
 
           return (
             <button
@@ -406,15 +409,17 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                   )}
                   style={
                     sensitiveVisible
-                      ? getUserAvatarStyle(log.username)
+                      ? getUserAvatarStyle(displayUsername)
                       : undefined
                   }
                 >
-                  {sensitiveVisible ? getUserAvatarFallback(log.username) : '•'}
+                  {sensitiveVisible
+                    ? getUserAvatarFallback(displayUsername)
+                    : '•'}
                 </AvatarFallback>
               </Avatar>
               <span className='text-muted-foreground truncate text-sm hover:underline'>
-                {sensitiveVisible ? log.username : '••••'}
+                {sensitiveVisible ? displayUsername : '••••'}
               </span>
             </button>
           )
@@ -432,9 +437,8 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     cell: function TokenNameCell({ row }) {
       const { sensitiveVisible } = useUsageLogsContext()
       const log = row.original
-      if (!isDisplayableLogType(log.type)) return null
 
-      const tokenName = log.token_name
+      const tokenName = getUsageLogDisplayTokenName(log)
       if (!tokenName) return null
 
       const other = parseLogOther(log.other)

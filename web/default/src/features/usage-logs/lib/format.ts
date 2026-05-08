@@ -87,6 +87,40 @@ export function parseLogOther(other: string): LogOtherData | null {
   }
 }
 
+function normalizeUsername(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function getUsageLogDisplayUsername(log: UsageLog): string {
+  const displayUsername = normalizeUsername(log.display_username)
+  if (displayUsername) return displayUsername
+
+  const other = parseLogOther(log.other)
+  const factoryUsername = normalizeUsername(other?.factory_username)
+  if (factoryUsername) return factoryUsername
+
+  if (log.type === 1 && log.content.includes('创作工厂令牌充值')) {
+    const match = log.content.match(/创作工厂账号[:：]\s*([^，,]+)/)
+    const legacyFactoryUsername = normalizeUsername(match?.[1])
+    if (legacyFactoryUsername) return legacyFactoryUsername
+  }
+
+  return normalizeUsername(log.username)
+}
+
+export function getUsageLogDisplayTokenName(log: UsageLog): string {
+  const tokenName = normalizeUsername(log.token_name)
+  if (tokenName) return tokenName
+
+  if (log.type === 3) {
+    const match = log.content.match(/API 令牌\s+(.+?)\s+额度/)
+    const legacyTokenName = normalizeUsername(match?.[1])
+    if (legacyTokenName) return legacyTokenName
+  }
+
+  return ''
+}
+
 /**
  * Get time color based on duration (in seconds)
  */
