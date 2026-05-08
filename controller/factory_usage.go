@@ -2,16 +2,19 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -22,6 +25,11 @@ type factoryUsageBindingPayload struct {
 	NewApiUsername  string `json:"new_api_username"`
 	TokenId         int    `json:"token_id"`
 	TokenName       string `json:"token_name"`
+	TokenStatus     int    `json:"token_status"`
+	RemainQuota     int    `json:"remain_quota"`
+	UsedQuota       int    `json:"used_quota"`
+	TotalQuota      int    `json:"total_quota"`
+	UnlimitedQuota  bool   `json:"unlimited_quota"`
 }
 
 type factoryUsageTarget struct {
@@ -34,6 +42,13 @@ type factoryUsageBindTokenRequest struct {
 	FactoryUserId   int    `json:"factory_user_id"`
 	FactoryUsername string `json:"factory_username"`
 	ApiKey          string `json:"api_key"`
+}
+
+type factoryUsageTopupTokenRequest struct {
+	FactoryUserId   int     `json:"factory_user_id"`
+	FactoryUsername string  `json:"factory_username"`
+	AmountCny       float64 `json:"amount_cny"`
+	Remark          string  `json:"remark"`
 }
 
 const defaultFactoryUsageSyncSecret = "dev-new-api-sync-secret"
@@ -84,22 +99,31 @@ func buildFactoryUsageBindingPayload(binding *model.FactoryAccountBinding) facto
 	if binding == nil {
 		return factoryUsageBindingPayload{}
 	}
-	return factoryUsageBindingPayload{
+	payload := factoryUsageBindingPayload{
 		FactoryUserId:   binding.FactoryUserId,
 		FactoryUsername: binding.FactoryUsername,
 		NewApiUserId:    binding.NewApiUserId,
 		NewApiUsername:  binding.NewApiUsername,
 		TokenId:         binding.TokenId,
-		TokenName:       getFactoryUsageTokenName(binding.TokenId),
 	}
+	fillFactoryUsageTokenInfo(&payload, binding.TokenId)
+	return payload
 }
 
-func getFactoryUsageTokenName(tokenId int) string {
+func fillFactoryUsageTokenInfo(payload *factoryUsageBindingPayload, tokenId int) {
+	if payload == nil || tokenId <= 0 {
+		return
+	}
 	token, err := model.GetTokenById(tokenId)
 	if err != nil || token == nil {
-		return ""
+		return
 	}
-	return token.Name
+	payload.TokenName = token.Name
+	payload.TokenStatus = token.Status
+	payload.RemainQuota = token.RemainQuota
+	payload.UsedQuota = token.UsedQuota
+	payload.TotalQuota = token.RemainQuota + token.UsedQuota
+	payload.UnlimitedQuota = token.UnlimitedQuota
 }
 
 func getFactoryUsageTarget(c *gin.Context) (*factoryUsageTarget, bool) {
@@ -148,6 +172,11 @@ func getFactoryUsageTargetByTokenName(c *gin.Context, factoryUserId int) (*facto
 		NewApiUsername:  newApiUsername,
 		TokenId:         token.Id,
 		TokenName:       token.Name,
+		TokenStatus:     token.Status,
+		RemainQuota:     token.RemainQuota,
+		UsedQuota:       token.UsedQuota,
+		TotalQuota:      token.RemainQuota + token.UsedQuota,
+		UnlimitedQuota:  token.UnlimitedQuota,
 	}
 	return &factoryUsageTarget{
 		TokenId: token.Id,
@@ -212,6 +241,151 @@ func BindFactoryUsageToken(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{
 		"bound":   true,
 		"binding": buildFactoryUsageBindingPayload(binding),
+	})
+}
+
+func convertFactoryUsageCnyToQuota(amountCny float64) (int, error) {
+	if amountCny <= 0 {
+		return 0, errors.New("充值金额必须大于 0")
+	}
+	if operation_setting.USDExchangeRate <= 0 || common.QuotaPerUnit <= 0 {
+		return 0, errors.New("New API 额度换算配置异常")
+	}
+	quota := decimal.NewFromFloat(amountCny).
+		Div(decimal.NewFromFloat(operation_setting.USDExchangeRate)).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+		Round(0).
+		IntPart()
+	if quota <= 0 {
+		return 0, errors.New("充值金额过低，无法换算为有效额度")
+	}
+	if quota > int64(getMaxTokenQuotaValue()) {
+		return 0, errors.New("充值金额超过有效范围")
+	}
+	return int(quota), nil
+}
+
+func getFactoryUsageTopupToken(req factoryUsageTopupTokenRequest) (*model.Token, *model.FactoryAccountBinding, string, error) {
+	factoryUserId := req.FactoryUserId
+	factoryUsername := strings.TrimSpace(req.FactoryUsername)
+	if factoryUserId <= 0 || factoryUsername == "" {
+		return nil, nil, "", errors.New("创作工厂账号信息不能为空")
+	}
+
+	binding, err := model.GetFactoryAccountBindingByFactoryUserId(factoryUserId)
+	if err == nil && binding != nil && binding.TokenId > 0 {
+		token, tokenErr := model.GetTokenById(binding.TokenId)
+		if tokenErr != nil {
+			return nil, nil, "", tokenErr
+		}
+		newApiUsername, _ := model.GetUsernameById(token.UserId, false)
+		return token, binding, newApiUsername, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, "", err
+	}
+
+	token, tokenErr := model.GetTokenByName(factoryUsername)
+	if tokenErr != nil {
+		if errors.Is(tokenErr, gorm.ErrRecordNotFound) {
+			return nil, nil, "", errors.New("当前创作工厂账号尚未绑定 New API 令牌")
+		}
+		return nil, nil, "", tokenErr
+	}
+	newApiUsername, _ := model.GetUsernameById(token.UserId, false)
+	return token, nil, newApiUsername, nil
+}
+
+func TopupFactoryUsageToken(c *gin.Context) {
+	if !assertFactoryUsageSecret(c) {
+		return
+	}
+
+	req := factoryUsageTopupTokenRequest{}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	token, binding, newApiUsername, err := getFactoryUsageTopupToken(req)
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	if token.UnlimitedQuota {
+		common.ApiErrorMsg(c, "当前令牌为无限额度，无需充值")
+		return
+	}
+	quota, err := convertFactoryUsageCnyToQuota(req.AmountCny)
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	if token.RemainQuota > getMaxTokenQuotaValue()-quota {
+		common.ApiErrorMsg(c, "充值后令牌额度超过有效范围")
+		return
+	}
+
+	token.RemainQuota += quota
+	if token.Status == common.TokenStatusExhausted && token.RemainQuota > 0 {
+		token.Status = common.TokenStatusEnabled
+	}
+	if err := token.Update(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	factoryUsername := strings.TrimSpace(req.FactoryUsername)
+	content := fmt.Sprintf(
+		"创作工厂令牌充值，创作工厂账号：%s，充值金额：¥%.2f，充值额度：%s",
+		factoryUsername,
+		req.AmountCny,
+		logger.FormatQuota(quota),
+	)
+	if remark := strings.TrimSpace(req.Remark); remark != "" {
+		content = fmt.Sprintf("%s，备注：%s", content, remark)
+	}
+	log := &model.Log{
+		UserId:    token.UserId,
+		Username:  newApiUsername,
+		CreatedAt: common.GetTimestamp(),
+		Type:      model.LogTypeTopup,
+		Content:   content,
+		TokenName: token.Name,
+		TokenId:   token.Id,
+		Quota:     quota,
+		Ip:        c.ClientIP(),
+		RequestId: c.GetString(common.RequestIdKey),
+		Other:     common.MapToJsonStr(map[string]interface{}{"source": "aigc_factory"}),
+	}
+	if err := model.LOG_DB.Create(log).Error; err != nil {
+		common.SysLog("failed to record factory token topup log: " + err.Error())
+	}
+
+	payload := factoryUsageBindingPayload{
+		FactoryUserId:   req.FactoryUserId,
+		FactoryUsername: factoryUsername,
+		NewApiUserId:    token.UserId,
+		NewApiUsername:  newApiUsername,
+		TokenId:         token.Id,
+		TokenName:       token.Name,
+		TokenStatus:     token.Status,
+		RemainQuota:     token.RemainQuota,
+		UsedQuota:       token.UsedQuota,
+		TotalQuota:      token.RemainQuota + token.UsedQuota,
+		UnlimitedQuota:  token.UnlimitedQuota,
+	}
+	if binding != nil {
+		payload.FactoryUsername = binding.FactoryUsername
+		payload.FactoryUserId = binding.FactoryUserId
+	}
+	common.ApiSuccess(c, gin.H{
+		"bound":             true,
+		"binding":           payload,
+		"quota":             quota,
+		"amount_cny":        req.AmountCny,
+		"amount_usd":        req.AmountCny / operation_setting.USDExchangeRate,
+		"quota_per_unit":    common.QuotaPerUnit,
+		"usd_exchange_rate": operation_setting.USDExchangeRate,
 	})
 }
 

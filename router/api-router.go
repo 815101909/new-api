@@ -329,6 +329,7 @@ func SetApiRouter(router *gin.Engine) {
 		factoryUsageRoute.Use(middleware.CORS())
 		{
 			factoryUsageRoute.POST("/bind-token", controller.BindFactoryUsageToken)
+			factoryUsageRoute.POST("/topup-token", controller.TopupFactoryUsageToken)
 			factoryUsageRoute.GET("/logs", controller.GetFactoryUsageLogs)
 			factoryUsageRoute.GET("/stat", controller.GetFactoryUsageStat)
 		}
