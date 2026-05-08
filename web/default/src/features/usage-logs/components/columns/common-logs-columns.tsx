@@ -3,7 +3,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { CircleAlert, Sparkles, KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+import { formatBillingCurrencyFromCNY } from '@/lib/currency'
 import {
   formatUseTime,
   formatLogQuota,
@@ -107,9 +107,9 @@ function buildDetailSegments(
 
   const priceOpts = { digitsLarge: 4, digitsSmall: 6, abbreviate: false }
   const formatPrice = (price: number) =>
-    `${formatBillingCurrencyFromUSD(price, priceOpts)}/M`
+    `${formatBillingCurrencyFromCNY(price, priceOpts)}/M`
   const formatPriceCompact = (price: number) =>
-    formatBillingCurrencyFromUSD(price, priceOpts)
+    formatBillingCurrencyFromCNY(price, priceOpts)
   const formatPriceList = (prices: string[], showUnit: boolean) => {
     const text = prices.join(' / ')
     return showUnit ? `${text}/M` : text
@@ -172,14 +172,14 @@ function buildDetailSegments(
     const isPerCall = isPerCallBilling(other.model_price)
     if (isPerCall) {
       segments.push({
-        text: `${t('Per-call')} · ${formatBillingCurrencyFromUSD(other.model_price!, priceOpts)}`,
+        text: `${t('Per-call')} · ${formatBillingCurrencyFromCNY(other.model_price!, priceOpts)}`,
       })
     } else if (other.model_ratio != null) {
-      const inputPriceUSD = other.model_ratio * 2.0
-      const baseEntries = [formatPriceCompact(inputPriceUSD)]
+      const inputPriceCNY = other.model_ratio * 2.0
+      const baseEntries = [formatPriceCompact(inputPriceCNY)]
       if (other.completion_ratio != null) {
         baseEntries.push(
-          formatPriceCompact(inputPriceUSD * other.completion_ratio)
+          formatPriceCompact(inputPriceCNY * other.completion_ratio)
         )
       }
       segments.push({
@@ -189,14 +189,14 @@ function buildDetailSegments(
       if (hasAnyCacheTokens(other)) {
         const cacheEntries = [
           other.cache_ratio != null && other.cache_ratio !== 1
-            ? formatPriceCompact(inputPriceUSD * other.cache_ratio)
+            ? formatPriceCompact(inputPriceCNY * other.cache_ratio)
             : null,
           other.cache_creation_ratio != null && other.cache_creation_ratio !== 1
-            ? formatPriceCompact(inputPriceUSD * other.cache_creation_ratio)
+            ? formatPriceCompact(inputPriceCNY * other.cache_creation_ratio)
             : null,
           other.cache_creation_ratio_1h != null &&
           other.cache_creation_ratio_1h !== 0
-            ? formatPriceCompact(inputPriceUSD * other.cache_creation_ratio_1h)
+            ? formatPriceCompact(inputPriceCNY * other.cache_creation_ratio_1h)
             : null,
         ].filter(Boolean) as string[]
 

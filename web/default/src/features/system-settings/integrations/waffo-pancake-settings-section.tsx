@@ -108,7 +108,7 @@ export function WaffoPancakeSettingsSection(props: Props) {
         },
         {
           key: 'WaffoPancakeCurrency',
-          value: values.WaffoPancakeCurrency || 'USD',
+          value: values.WaffoPancakeCurrency || 'CNY',
         },
         {
           key: 'WaffoPancakeUnitPrice',
@@ -156,7 +156,7 @@ export function WaffoPancakeSettingsSection(props: Props) {
     <SettingsSection
       title={t('Waffo Pancake Payment Gateway')}
       description={t(
-        'Configure Waffo Pancake hosted checkout integration for USD-priced top-ups'
+        'Configure Waffo Pancake hosted checkout integration for CNY-priced top-ups'
       )}
     >
       <Alert>
@@ -188,7 +188,7 @@ export function WaffoPancakeSettingsSection(props: Props) {
         </div>
         <div className='grid gap-1.5'>
           <Label>{t('Currency')}</Label>
-          <Input placeholder='USD' {...form.register('WaffoPancakeCurrency')} />
+          <Input placeholder='CNY' {...form.register('WaffoPancakeCurrency')} />
         </div>
       </div>
 
@@ -264,7 +264,7 @@ export function WaffoPancakeSettingsSection(props: Props) {
 
       <div className='grid grid-cols-2 gap-4'>
         <div className='grid gap-1.5'>
-          <Label>{t('Unit price (local currency / USD)')}</Label>
+          <Label>{t('Unit price (payment currency / CNY credit)')}</Label>
           <Input
             type='number'
             step={0.01}
@@ -273,7 +273,7 @@ export function WaffoPancakeSettingsSection(props: Props) {
           />
         </div>
         <div className='grid gap-1.5'>
-          <Label>{t('Minimum top-up (USD)')}</Label>
+          <Label>{t('Minimum top-up (CNY)')}</Label>
           <Input
             type='number'
             min={1}

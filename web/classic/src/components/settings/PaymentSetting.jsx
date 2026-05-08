@@ -35,7 +35,7 @@ const PaymentSetting = () => {
     PayAddress: '',
     EpayId: '',
     EpayKey: '',
-    Price: 7.3,
+    Price: 1.0,
     MinTopUp: 1,
     TopupGroupRatio: '',
     CustomCallbackAddress: '',
@@ -46,7 +46,7 @@ const PaymentSetting = () => {
     StripeApiSecret: '',
     StripeWebhookSecret: '',
     StripePriceId: '',
-    StripeUnitPrice: 8.0,
+    StripeUnitPrice: 1.0,
     StripeMinTopUp: 1,
     StripePromotionCodesEnabled: false,
 
@@ -57,7 +57,7 @@ const PaymentSetting = () => {
     WaffoPancakeStoreID: '',
     WaffoPancakeProductID: '',
     WaffoPancakeReturnURL: '',
-    WaffoPancakeCurrency: 'USD',
+    WaffoPancakeCurrency: 'CNY',
     WaffoPancakeUnitPrice: 1.0,
     WaffoPancakeMinTopUp: 1,
   });

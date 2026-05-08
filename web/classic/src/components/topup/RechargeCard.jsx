@@ -406,7 +406,7 @@ const RechargeCard = ({
                       <span>{t('选择充值额度')}</span>
                       {(() => {
                         const { symbol, rate, type } = getCurrencyConfig();
-                        if (type === 'USD') return null;
+                        if (type === 'CNY') return null;
 
                         return (
                           <span
@@ -416,7 +416,7 @@ const RechargeCard = ({
                               fontWeight: 'normal',
                             }}
                           >
-                            (1 $ = {rate.toFixed(2)} {symbol})
+                            (¥1 = {rate.toFixed(2)} {symbol})
                           </span>
                         );
                       })()}
@@ -437,31 +437,15 @@ const RechargeCard = ({
 
                       // 根据当前货币类型换算显示金额和数量
                       const { symbol, rate, type } = getCurrencyConfig();
-                      const statusStr = localStorage.getItem('status');
-                      let usdRate = 7; // 默认CNY汇率
-                      try {
-                        if (statusStr) {
-                          const s = JSON.parse(statusStr);
-                          usdRate = s?.usd_exchange_rate || 7;
-                        }
-                      } catch (e) {}
-
                       let displayValue = preset.value; // 显示的数量
                       let displayActualPay = actualPay;
                       let displaySave = save;
 
-                      if (type === 'USD') {
-                        // 数量保持USD，价格从CNY转USD
-                        displayActualPay = actualPay / usdRate;
-                        displaySave = save / usdRate;
-                      } else if (type === 'CNY') {
-                        // 数量转CNY，价格已是CNY
-                        displayValue = preset.value * usdRate;
-                      } else if (type === 'CUSTOM') {
+                      if (type === 'CUSTOM') {
                         // 数量和价格都转自定义货币
                         displayValue = preset.value * rate;
-                        displayActualPay = (actualPay / usdRate) * rate;
-                        displaySave = (save / usdRate) * rate;
+                        displayActualPay = actualPay * rate;
+                        displaySave = save * rate;
                       }
 
                       return (
@@ -543,7 +527,7 @@ const RechargeCard = ({
                           {t('充值额度')}: {product.quota}
                         </div>
                         <div className='text-lg font-semibold text-blue-600'>
-                          {product.currency === 'EUR' ? '€' : '$'}
+                          {product.currency === 'EUR' ? '€' : '¥'}
                           {product.price}
                         </div>
                       </Card>

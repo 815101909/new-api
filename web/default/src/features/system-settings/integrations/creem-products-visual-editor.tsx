@@ -57,7 +57,7 @@ export function CreemProductsVisualEditor({
         typeof item.productId === 'string' &&
         typeof item.price === 'number' &&
         typeof item.quota === 'number' &&
-        (item.currency === 'USD' || item.currency === 'EUR')
+        (item.currency === 'CNY' || item.currency === 'EUR')
     )
   }, [value, t])
 

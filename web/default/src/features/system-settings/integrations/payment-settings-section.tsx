@@ -565,7 +565,7 @@ export function PaymentSettingsSection({
                 name='Price'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Price (local currency / USD)')}</FormLabel>
+                    <FormLabel>{t('Price (payment currency / CNY credit)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -579,7 +579,7 @@ export function PaymentSettingsSection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'How much to charge for each US dollar of balance (Epay)'
+                        'How much to charge for each CNY of balance (Epay)'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -592,7 +592,7 @@ export function PaymentSettingsSection({
                 name='MinTopUp'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                    <FormLabel>{t('Minimum top-up (CNY)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -605,7 +605,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Smallest USD amount users can recharge (Epay)')}
+                      {t('Smallest CNY amount users can recharge (Epay)')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1030,7 +1030,7 @@ export function PaymentSettingsSection({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      {t('Unit price (local currency / USD)')}
+                      {t('Unit price (payment currency / CNY credit)')}
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -1044,7 +1044,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('e.g., 8 means 8 local currency per USD')}
+                      {t('e.g., 1 means 1 payment currency unit per CNY credit')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1056,7 +1056,7 @@ export function PaymentSettingsSection({
                 name='StripeMinTopUp'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                    <FormLabel>{t('Minimum top-up (CNY)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -1069,7 +1069,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum recharge amount in USD')}
+                      {t('Minimum recharge amount in CNY')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1249,7 +1249,7 @@ export function PaymentSettingsSection({
                     ) : (
                       <Textarea
                         rows={4}
-                        placeholder='[{"name":"Basic","productId":"prod_xxx","price":10,"quota":500000,"currency":"USD"}]'
+                        placeholder='[{"name":"Basic","productId":"prod_xxx","price":10,"quota":500000,"currency":"CNY"}]'
                         {...field}
                         onChange={(event) => field.onChange(event.target.value)}
                       />

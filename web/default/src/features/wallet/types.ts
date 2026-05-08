@@ -49,8 +49,8 @@ export interface CreemProduct {
   price: number
   /** Quota amount to credit */
   quota: number
-  /** Currency (USD or EUR) */
-  currency: 'USD' | 'EUR'
+  /** Currency (CNY or EUR) */
+  currency: 'CNY' | 'EUR'
 }
 
 /**

@@ -615,7 +615,7 @@ export const calculateModelPrice = ({
   tokenUnit,
   displayPrice,
   currency,
-  quotaDisplayType = 'USD',
+  quotaDisplayType = 'CNY',
   precision = 4,
 }) => {
   // 1. 选择实际使用的分组
@@ -659,7 +659,7 @@ export const calculateModelPrice = ({
   if (record.quota_type === 0) {
     // 按量计费
     const isTokensDisplay = quotaDisplayType === 'TOKENS';
-    const inputRatioPriceUSD = record.model_ratio * 2 * usedGroupRatio;
+    const inputRatioPriceCNY = record.model_ratio * 2 * usedGroupRatio;
     const unitDivisor = tokenUnit === 'K' ? 1000 : 1;
     const unitLabel = tokenUnit === 'K' ? 'K' : 'M';
     const hasRatioValue = (value) =>
@@ -687,7 +687,7 @@ export const calculateModelPrice = ({
       };
     }
 
-    let symbol = '$';
+    let symbol = '¥';
     if (currency === 'CNY') {
       symbol = '¥';
     } else if (currency === 'CUSTOM') {
@@ -704,37 +704,37 @@ export const calculateModelPrice = ({
       }
     }
 
-    const formatTokenPrice = (priceUSD) => {
-      const rawDisplayPrice = displayPrice(priceUSD);
+    const formatTokenPrice = (priceCNY) => {
+      const rawDisplayPrice = displayPrice(priceCNY);
       const numericPrice =
         parseFloat(rawDisplayPrice.replace(/[^0-9.]/g, '')) / unitDivisor;
       return `${symbol}${numericPrice.toFixed(precision)}`;
     };
 
-    const inputPrice = formatTokenPrice(inputRatioPriceUSD);
+    const inputPrice = formatTokenPrice(inputRatioPriceCNY);
     const audioInputPrice = hasRatioValue(record.audio_ratio)
-      ? formatTokenPrice(inputRatioPriceUSD * Number(record.audio_ratio))
+      ? formatTokenPrice(inputRatioPriceCNY * Number(record.audio_ratio))
       : null;
 
     return {
       inputPrice,
       completionPrice: formatTokenPrice(
-        inputRatioPriceUSD * Number(record.completion_ratio),
+        inputRatioPriceCNY * Number(record.completion_ratio),
       ),
       cachePrice: hasRatioValue(record.cache_ratio)
-        ? formatTokenPrice(inputRatioPriceUSD * Number(record.cache_ratio))
+        ? formatTokenPrice(inputRatioPriceCNY * Number(record.cache_ratio))
         : null,
       createCachePrice: hasRatioValue(record.create_cache_ratio)
-        ? formatTokenPrice(inputRatioPriceUSD * Number(record.create_cache_ratio))
+        ? formatTokenPrice(inputRatioPriceCNY * Number(record.create_cache_ratio))
         : null,
       imagePrice: hasRatioValue(record.image_ratio)
-        ? formatTokenPrice(inputRatioPriceUSD * Number(record.image_ratio))
+        ? formatTokenPrice(inputRatioPriceCNY * Number(record.image_ratio))
         : null,
       audioInputPrice,
       audioOutputPrice:
         audioInputPrice && hasRatioValue(record.audio_completion_ratio)
           ? formatTokenPrice(
-              inputRatioPriceUSD *
+              inputRatioPriceCNY *
                 Number(record.audio_ratio) *
                 Number(record.audio_completion_ratio),
             )
@@ -749,8 +749,8 @@ export const calculateModelPrice = ({
 
   if (record.quota_type === 1) {
     // 按次计费
-    const priceUSD = parseFloat(record.model_price) * usedGroupRatio;
-    const displayVal = displayPrice(priceUSD);
+    const priceCNY = parseFloat(record.model_price) * usedGroupRatio;
+    const displayVal = displayPrice(priceCNY);
 
     return {
       price: displayVal,
@@ -774,7 +774,7 @@ export const calculateModelPrice = ({
 export const getModelPriceItems = (
   priceData,
   t,
-  quotaDisplayType = 'USD',
+  quotaDisplayType = 'CNY',
 ) => {
   if (priceData.isDynamicPricing) {
     return [
@@ -900,14 +900,14 @@ export const getModelPriceItems = (
 export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
   if (!billingExpr) return <span style={{ color: 'var(--semi-color-text-1)' }}>{t('动态计费')}</span>;
 
-  const quotaDisplayType = localStorage.getItem('quota_display_type') || 'USD';
-  let symbol = '$';
+  const quotaDisplayType = localStorage.getItem('quota_display_type') || 'CNY';
+  let symbol = '¥';
   let rate = 1;
   try {
     const s = JSON.parse(localStorage.getItem('status') || '{}');
     if (quotaDisplayType === 'CNY') {
       symbol = '¥';
-      rate = s?.usd_exchange_rate || 7;
+      rate = 1;
     } else if (quotaDisplayType === 'CUSTOM') {
       symbol = s?.custom_currency_symbol || '¤';
       rate = s?.custom_currency_exchange_rate || 1;
@@ -989,7 +989,7 @@ export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
 };
 
 // 格式化价格信息（用于卡片视图）
-export const formatPriceInfo = (priceData, t, quotaDisplayType = 'USD') => {
+export const formatPriceInfo = (priceData, t, quotaDisplayType = 'CNY') => {
   const items = getModelPriceItems(priceData, t, quotaDisplayType);
   return (
     <>
@@ -1056,7 +1056,7 @@ export const createCardProPagination = ({
 const DEFAULT_PRICING_FILTERS = {
   search: '',
   showWithRecharge: false,
-  currency: 'USD',
+  currency: 'CNY',
   showRatio: false,
   viewMode: 'card',
   tokenUnit: 'M',

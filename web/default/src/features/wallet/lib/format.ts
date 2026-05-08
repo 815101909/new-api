@@ -5,13 +5,13 @@ import { DEFAULT_DISCOUNT_RATE } from '../constants'
 // ============================================================================
 
 /**
- * Format Creem price with currency symbol (USD/EUR)
+ * Format Creem price with currency symbol (CNY/EUR)
  */
 export function formatCreemPrice(
   price: number,
-  currency: 'USD' | 'EUR'
+  currency: 'CNY' | 'EUR'
 ): string {
-  const symbol = currency === 'EUR' ? '€' : '$'
+  const symbol = currency === 'EUR' ? '€' : '¥'
   return `${symbol}${price.toFixed(2)}`
 }
 
@@ -60,14 +60,13 @@ export function getDiscountLabel(discount: number): string {
 export function calculatePresetPricing(
   presetValue: number,
   priceRatio: number,
-  discount: number,
-  usdExchangeRate: number = 1
+  discount: number
 ) {
   const originalPrice = presetValue * priceRatio
   const actualPrice = originalPrice * discount
   const savedAmount = originalPrice - actualPrice
   const hasDiscount = discount < 1.0
-  const displayValue = presetValue * usdExchangeRate
+  const displayValue = presetValue
 
   return {
     displayValue,

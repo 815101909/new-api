@@ -62,7 +62,7 @@ func TestGetWaffoPancakePayMoney(t *testing.T) {
 			name:             "currency display applies unit price group ratio and discount",
 			amount:           10,
 			group:            "vip",
-			quotaDisplayType: operation_setting.QuotaDisplayTypeUSD,
+			quotaDisplayType: operation_setting.QuotaDisplayTypeCNY,
 			expected:         24,
 		},
 		{
@@ -76,7 +76,7 @@ func TestGetWaffoPancakePayMoney(t *testing.T) {
 			name:             "non-positive discount falls back to no discount",
 			amount:           20,
 			group:            "default",
-			quotaDisplayType: operation_setting.QuotaDisplayTypeUSD,
+			quotaDisplayType: operation_setting.QuotaDisplayTypeCNY,
 			expected:         50,
 		},
 	}

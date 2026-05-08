@@ -2,20 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { DEFAULT_SYSTEM_NAME, DEFAULT_LOGO } from '@/lib/constants'
 
-export type CurrencyDisplayType = 'USD' | 'CNY' | 'TOKENS' | 'CUSTOM'
+export type CurrencyDisplayType = 'CNY' | 'TOKENS' | 'CUSTOM'
 
 export interface CurrencyConfig {
   /** Whether to render quota values as currency instead of raw units */
   displayInCurrency: boolean
   /** Currency presentation strategy configured by the admin */
   quotaDisplayType: CurrencyDisplayType
-  /** Number of quota units that equal one USD */
+  /** Number of quota units that equal one CNY */
   quotaPerUnit: number
-  /** Exchange rate from USD to the configured local currency */
-  usdExchangeRate: number
   /** Custom currency symbol configured by the admin (used when type === CUSTOM) */
   customCurrencySymbol: string
-  /** Exchange rate from USD to the custom currency (used when type === CUSTOM) */
+  /** Display multiplier from CNY to the custom currency (used when type === CUSTOM) */
   customCurrencyExchangeRate: number
 }
 
@@ -30,9 +28,8 @@ export interface SystemConfig {
 
 export const DEFAULT_CURRENCY_CONFIG: CurrencyConfig = {
   displayInCurrency: true,
-  quotaDisplayType: 'USD',
+  quotaDisplayType: 'CNY',
   quotaPerUnit: 500000,
-  usdExchangeRate: 1,
   customCurrencySymbol: '¤',
   customCurrencyExchangeRate: 1,
 }

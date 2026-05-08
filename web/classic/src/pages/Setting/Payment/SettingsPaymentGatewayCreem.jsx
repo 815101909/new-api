@@ -55,7 +55,7 @@ export default function SettingsPaymentGatewayCreem(props) {
     productId: '',
     price: 0,
     quota: 0,
-    currency: 'USD',
+    currency: 'CNY',
   });
   const formApiRef = useRef(null);
 
@@ -149,7 +149,7 @@ export default function SettingsPaymentGatewayCreem(props) {
         productId: '',
         price: 0,
         quota: 0,
-        currency: 'USD',
+        currency: 'CNY',
       });
     }
     setShowProductModal(true);
@@ -163,7 +163,7 @@ export default function SettingsPaymentGatewayCreem(props) {
       productId: '',
       price: 0,
       quota: 0,
-      currency: 'USD',
+      currency: 'CNY',
     });
   };
 
@@ -385,14 +385,14 @@ export default function SettingsPaymentGatewayCreem(props) {
               size='large'
               className='w-full'
             >
-              <Select.Option value='USD'>{t('USD (美元)')}</Select.Option>
+              <Select.Option value='CNY'>{t('CNY (人民币)')}</Select.Option>
               <Select.Option value='EUR'>{t('EUR (欧元)')}</Select.Option>
             </Select>
           </div>
           <div>
             <Text strong className='block mb-2'>
               {t('价格')} (
-              {productForm.currency === 'EUR' ? t('欧元') : t('美元')})
+              {productForm.currency === 'EUR' ? t('欧元') : t('人民币')})
             </Text>
             <InputNumber
               value={productForm.price}

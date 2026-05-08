@@ -29,20 +29,19 @@ import (
 )
 
 const (
-	defaultTimeoutSeconds       = 10
-	defaultEndpoint             = "/api/pricing"
-	maxConcurrentFetches        = 8
-	maxRatioConfigBytes         = 10 << 20 // 10MB
-	floatEpsilon                = 1e-9
-	officialRatioPresetID       = -100
-	officialRatioPresetName     = "官方倍率预设"
-	officialRatioPresetBaseURL  = "https://basellm.github.io"
-	modelsDevPresetID           = -101
-	modelsDevPresetName         = "models.dev 价格预设"
-	modelsDevPresetBaseURL      = "https://models.dev"
-	modelsDevHost               = "models.dev"
-	modelsDevPath               = "/api.json"
-	modelsDevInputCostRatioBase = 1000.0
+	defaultTimeoutSeconds      = 10
+	defaultEndpoint            = "/api/pricing"
+	maxConcurrentFetches       = 8
+	maxRatioConfigBytes        = 10 << 20 // 10MB
+	floatEpsilon               = 1e-9
+	officialRatioPresetID      = -100
+	officialRatioPresetName    = "官方倍率预设"
+	officialRatioPresetBaseURL = "https://basellm.github.io"
+	modelsDevPresetID          = -101
+	modelsDevPresetName        = "models.dev 价格预设"
+	modelsDevPresetBaseURL     = "https://models.dev"
+	modelsDevHost              = "models.dev"
+	modelsDevPath              = "/api.json"
 )
 
 func nearlyEqual(a, b float64) bool {
@@ -715,11 +714,8 @@ func isModelsDevAPIEndpoint(rawURL string) bool {
 }
 
 // convertOpenRouterToRatioData parses OpenRouter's /v1/models response and converts
-// per-token USD pricing into the local ratio format.
-// model_ratio = prompt_price_per_token * 1_000_000 * (USD / 1000)
-//
-//	since 1 ratio unit = $0.002/1K tokens and USD=500, the factor is 500_000
-//
+// the source per-token pricing into the local CNY ratio format.
+// model_ratio = prompt_price_per_token * 1_000_000 * CNYPriceMigrationRate / 2
 // completion_ratio = completion_price / prompt_price (output/input multiplier)
 func convertOpenRouterToRatioData(reader io.Reader) (map[string]any, error) {
 	var orResp struct {
@@ -774,7 +770,7 @@ func convertOpenRouterToRatioData(reader io.Reader) (map[string]any, error) {
 		}
 
 		// Normal case: promptPrice > 0
-		ratio := promptPrice * 1000 * ratio_setting.USD
+		ratio := promptPrice * 1_000_000 * ratio_setting.CNYPriceMigrationRate / 2
 		ratio = roundRatioValue(ratio)
 		modelRatioMap[m.ID] = ratio
 
@@ -893,10 +889,10 @@ func shouldReplaceModelsDevCandidate(current, next modelsDevCandidate) bool {
 }
 
 // convertModelsDevToRatioData parses models.dev /api.json and converts
-// provider pricing metadata into local ratio format.
-// models.dev costs are USD per 1M tokens:
+// provider pricing metadata into local CNY ratio format.
+// models.dev costs are source-currency prices per 1M tokens:
 //
-//	model_ratio = input_cost_per_1M / 2
+//	model_ratio = input_cost_per_1M * CNYPriceMigrationRate / 2
 //	completion_ratio = output_cost / input_cost
 //	cache_ratio = cache_read_cost / input_cost
 //
@@ -957,7 +953,7 @@ func convertModelsDevToRatioData(reader io.Reader) (map[string]any, error) {
 			continue
 		}
 
-		modelRatio := candidate.Input * float64(ratio_setting.USD) / modelsDevInputCostRatioBase
+		modelRatio := candidate.Input * ratio_setting.CNYPriceMigrationRate / 2
 		modelRatioMap[modelName] = roundRatioValue(modelRatio)
 
 		if candidate.Output != nil {

@@ -904,7 +904,7 @@ export function ModelMutateDrawer({
                   name='price'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Fixed price (USD)')}</FormLabel>
+                      <FormLabel>{t('Fixed price (CNY)')}</FormLabel>
                       <FormControl>
                         <Input
                           type='text'
@@ -920,7 +920,7 @@ export function ModelMutateDrawer({
                       </FormControl>
                       <FormDescription>
                         {t(
-                          'Cost in USD per request, regardless of tokens used.'
+                          'Cost in CNY per request, regardless of tokens used.'
                         )}
                       </FormDescription>
                       <FormMessage />
@@ -946,7 +946,7 @@ export function ModelMutateDrawer({
                       <div className='flex items-center space-x-2'>
                         <RadioGroupItem value='price' id='price' />
                         <Label htmlFor='price' className='font-normal'>
-                          {t('Price mode (USD per 1M tokens)')}
+                          {t('Price mode (CNY per 1M tokens)')}
                         </Label>
                       </div>
                     </RadioGroup>
@@ -1036,7 +1036,7 @@ export function ModelMutateDrawer({
                     <>
                       <div className='space-y-4'>
                         <div className='space-y-2'>
-                          <Label>{t('Prompt price ($/1M tokens)')}</Label>
+                          <Label>{t('Prompt price (¥/1M tokens)')}</Label>
                           <Input
                             type='text'
                             placeholder='2.0'
@@ -1053,7 +1053,7 @@ export function ModelMutateDrawer({
                         </div>
 
                         <div className='space-y-2'>
-                          <Label>{t('Completion price ($/1M tokens)')}</Label>
+                          <Label>{t('Completion price (¥/1M tokens)')}</Label>
                           <Input
                             type='text'
                             placeholder='4.0'

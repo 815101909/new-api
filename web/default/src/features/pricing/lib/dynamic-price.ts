@@ -1,4 +1,4 @@
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+import { formatBillingCurrencyFromCNY } from '@/lib/currency'
 import { TOKEN_UNIT_DIVISORS } from '../constants'
 import type { PricingModel, TokenUnit } from '../types'
 import {
@@ -14,7 +14,6 @@ type DynamicPriceOptions = {
   tokenUnit: TokenUnit
   showRechargePrice?: boolean
   priceRate?: number
-  usdExchangeRate?: number
   groupRatioMultiplier?: number
 }
 
@@ -65,11 +64,10 @@ export function getDynamicDisplayGroupRatio(model: PricingModel): number {
 function applyRechargeRate(
   price: number,
   showWithRecharge: boolean,
-  priceRate: number,
-  usdExchangeRate: number
+  priceRate: number
 ): number {
   if (!showWithRecharge) return price
-  return (price * priceRate) / usdExchangeRate
+  return price * priceRate
 }
 
 export function formatDynamicUnitPrice(
@@ -78,18 +76,16 @@ export function formatDynamicUnitPrice(
 ): string {
   const groupRatio = options.groupRatioMultiplier ?? 1
   const priceRate = options.priceRate ?? 1
-  const usdExchangeRate = options.usdExchangeRate ?? 1
-  const priceUSD =
+  const priceCNY =
     (valuePerMillionTokens * groupRatio) /
     TOKEN_UNIT_DIVISORS[options.tokenUnit]
   const displayPrice = applyRechargeRate(
-    priceUSD,
+    priceCNY,
     options.showRechargePrice ?? false,
-    priceRate,
-    usdExchangeRate
+    priceRate
   )
 
-  return formatBillingCurrencyFromUSD(displayPrice, {
+  return formatBillingCurrencyFromCNY(displayPrice, {
     digitsLarge: 4,
     digitsSmall: 6,
     abbreviate: false,

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RefreshCw, DollarSign } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { formatCurrencyFromUSD } from '@/lib/currency'
+import { formatCurrencyFromCNY } from '@/lib/currency'
 import { formatTimestampToDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import {
@@ -115,7 +115,7 @@ export function BalanceQueryDialog({
   }
 
   const formatBalance = (bal: number) =>
-    formatCurrencyFromUSD(bal, {
+    formatCurrencyFromCNY(bal, {
       digitsLarge: 2,
       digitsSmall: 4,
       abbreviate: false,

@@ -25,7 +25,6 @@ interface StatusApiResponse {
     display_in_currency?: boolean
     quota_display_type?: CurrencyDisplayType
     quota_per_unit?: number
-    usd_exchange_rate?: number
     custom_currency_symbol?: string
     custom_currency_exchange_rate?: number
   }
@@ -59,10 +58,6 @@ export function mapStatusDataToConfig(
     quotaPerUnit: toNumber(
       data.quota_per_unit,
       DEFAULT_CURRENCY_CONFIG.quotaPerUnit
-    ),
-    usdExchangeRate: toNumber(
-      data.usd_exchange_rate,
-      DEFAULT_CURRENCY_CONFIG.usdExchangeRate
     ),
     customCurrencySymbol:
       data.custom_currency_symbol?.trim() ||

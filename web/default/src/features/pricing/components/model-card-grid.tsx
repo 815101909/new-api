@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -13,17 +13,35 @@ export interface ModelCardGridProps {
   models: PricingModel[]
   onModelClick: (modelName: string) => void
   priceRate?: number
-  usdExchangeRate?: number
   tokenUnit?: TokenUnit
   showRechargePrice?: boolean
 }
 
 export function ModelCardGrid(props: ModelCardGridProps) {
   const { t } = useTranslation()
-  const [page, setPage] = useState(1)
   const pageSize = DEFAULT_PRICING_PAGE_SIZE
   const tokenUnit = props.tokenUnit ?? DEFAULT_TOKEN_UNIT
   const totalPages = Math.max(1, Math.ceil(props.models.length / pageSize))
+  const modelsKey = useMemo(
+    () => props.models.map((model) => model.id ?? model.model_name).join('|'),
+    [props.models]
+  )
+  const [pagination, setPagination] = useState({ modelsKey, page: 1 })
+  const page =
+    pagination.modelsKey === modelsKey
+      ? Math.min(pagination.page, totalPages)
+      : 1
+  const setPage = (updater: number | ((current: number) => number)) => {
+    setPagination((current) => {
+      const currentPage = current.modelsKey === modelsKey ? current.page : 1
+      const nextPage =
+        typeof updater === 'function' ? updater(currentPage) : updater
+      return {
+        modelsKey,
+        page: Math.min(totalPages, Math.max(1, nextPage)),
+      }
+    })
+  }
 
   const perfQuery = useQuery({
     queryKey: ['perf-metrics-summary'],
@@ -31,10 +49,6 @@ export function ModelCardGrid(props: ModelCardGridProps) {
     staleTime: 60 * 1000,
     retry: false,
   })
-
-  useEffect(() => {
-    setPage(1)
-  }, [props.models])
 
   const pagedModels = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -64,7 +78,6 @@ export function ModelCardGrid(props: ModelCardGridProps) {
             model={model}
             tokenUnit={tokenUnit}
             priceRate={props.priceRate}
-            usdExchangeRate={props.usdExchangeRate}
             showRechargePrice={props.showRechargePrice}
             perf={perfMap.get(model.model_name || '')}
             onClick={() => props.onModelClick(model.model_name || '')}

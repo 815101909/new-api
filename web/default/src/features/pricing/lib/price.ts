@@ -1,4 +1,4 @@
-import { formatCurrencyFromUSD } from '@/lib/currency'
+import { formatCurrencyFromCNY } from '@/lib/currency'
 import { QUOTA_TYPE_VALUES, TOKEN_UNIT_DIVISORS } from '../constants'
 import type { PricingModel, TokenUnit, PriceType } from '../types'
 
@@ -56,10 +56,7 @@ function getMinGroupRatio(
 }
 
 /**
- * Calculate token price in USD.
- *
- * Returns NaN when the required ratio field is missing/null so callers can
- * skip rendering that price type.
+ * Calculate token price in CNY.
  */
 function calculateTokenPrice(
   model: PricingModel,
@@ -106,37 +103,15 @@ function hasRatio(value: number | null | undefined): boolean {
 /**
  * Apply recharge rate to price
  *
- * priceRate represents how much users need to recharge (in the display currency)
- * to get 1 USD credit. usdExchangeRate is the real exchange rate.
- *
- * The returned value will be formatted by formatCurrencyFromUSD, which will
- * multiply by the display currency's exchange rate.
- *
- * Examples:
- *
- * 1. Display currency = USD:
- *    - Model: 1 USD
- *    - priceRate = 0.5 (recharge $0.5 to get $1 credit)
- *    - usdExchangeRate = 1
- *    - Return: 1 × 0.5 / 1 = 0.5
- *    - formatCurrencyFromUSD(0.5) → $0.5 ✓
- *
- * 2. Display currency = CNY:
- *    - Model: 1 USD
- *    - priceRate = 4 (recharge ¥4 to get $1 credit)
- *    - usdExchangeRate = 7 (real rate: 1 USD = ¥7)
- *    - Return: 1 × 4 / 7 = 0.571
- *    - formatCurrencyFromUSD(0.571) → 0.571 × 7 = ¥4 ✓
- *    - Normal price: ¥7, Recharge price: ¥4 (cheaper!)
+ * priceRate represents how much users need to recharge to get ¥1 credit.
  */
 function applyRechargeRate(
   price: number,
   showWithRecharge: boolean,
-  priceRate: number,
-  usdExchangeRate: number
+  priceRate: number
 ): number {
   if (!showWithRecharge) return price
-  return (price * priceRate) / usdExchangeRate
+  return price * priceRate
 }
 
 /**
@@ -147,8 +122,7 @@ export function formatPrice(
   type: PriceType,
   tokenUnit: TokenUnit,
   showWithRecharge = false,
-  priceRate = 1,
-  usdExchangeRate = 1
+  priceRate = 1
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -160,16 +134,15 @@ export function formatPrice(
   const groupRatio = model.group_ratio || {}
   const minRatio = getMinGroupRatio(enableGroups, groupRatio)
 
-  let priceInUSD = calculateTokenPrice(model, type, minRatio)
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
+  let priceInCNY = calculateTokenPrice(model, type, minRatio)
+  priceInCNY = applyRechargeRate(
+    priceInCNY,
     showWithRecharge,
-    priceRate,
-    usdExchangeRate
+    priceRate
   )
 
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
-  return formatCurrencyFromUSD(price, {
+  const price = priceInCNY / TOKEN_UNIT_DIVISORS[tokenUnit]
+  return formatCurrencyFromCNY(price, {
     digitsLarge: 4,
     digitsSmall: 6,
     abbreviate: false,
@@ -184,9 +157,8 @@ export function formatGroupPrice(
   group: string,
   type: PriceType,
   tokenUnit: TokenUnit,
-  showWithRecharge = false,
-  priceRate = 1,
-  usdExchangeRate = 1,
+  showWithRecharge: boolean,
+  priceRate: number,
   groupRatio: Record<string, number>
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
@@ -194,17 +166,12 @@ export function formatGroupPrice(
   }
 
   const ratio = groupRatio[group] || 1
-  let priceInUSD = calculateTokenPrice(model, type, ratio)
+  let priceInCNY = calculateTokenPrice(model, type, ratio)
 
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
-    showWithRecharge,
-    priceRate,
-    usdExchangeRate
-  )
+  priceInCNY = applyRechargeRate(priceInCNY, showWithRecharge, priceRate)
 
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
-  return formatCurrencyFromUSD(price, {
+  const price = priceInCNY / TOKEN_UNIT_DIVISORS[tokenUnit]
+  return formatCurrencyFromCNY(price, {
     digitsLarge: 4,
     digitsSmall: 6,
     abbreviate: false,
@@ -217,9 +184,8 @@ export function formatGroupPrice(
 export function formatFixedPrice(
   model: PricingModel,
   group: string,
-  showWithRecharge = false,
-  priceRate = 1,
-  usdExchangeRate = 1,
+  showWithRecharge: boolean,
+  priceRate: number,
   groupRatio: Record<string, number>
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
@@ -227,16 +193,11 @@ export function formatFixedPrice(
   }
 
   const ratio = groupRatio[group] || 1
-  let priceInUSD = (model.model_price || 0) * ratio
+  let priceInCNY = (model.model_price || 0) * ratio
 
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
-    showWithRecharge,
-    priceRate,
-    usdExchangeRate
-  )
+  priceInCNY = applyRechargeRate(priceInCNY, showWithRecharge, priceRate)
 
-  return formatCurrencyFromUSD(priceInUSD, {
+  return formatCurrencyFromCNY(priceInCNY, {
     digitsLarge: 4,
     digitsSmall: 4,
     abbreviate: false,
@@ -249,8 +210,7 @@ export function formatFixedPrice(
 export function formatRequestPrice(
   model: PricingModel,
   showWithRecharge = false,
-  priceRate = 1,
-  usdExchangeRate = 1
+  priceRate = 1
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -262,16 +222,15 @@ export function formatRequestPrice(
   const groupRatio = model.group_ratio || {}
   const minRatio = getMinGroupRatio(enableGroups, groupRatio)
 
-  let priceInUSD = (model.model_price || 0) * minRatio
+  let priceInCNY = (model.model_price || 0) * minRatio
 
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
+  priceInCNY = applyRechargeRate(
+    priceInCNY,
     showWithRecharge,
-    priceRate,
-    usdExchangeRate
+    priceRate
   )
 
-  return formatCurrencyFromUSD(priceInUSD, {
+  return formatCurrencyFromCNY(priceInCNY, {
     digitsLarge: 4,
     digitsSmall: 4,
     abbreviate: false,

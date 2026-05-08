@@ -38,7 +38,7 @@ const defaultInputs = {
   WaffoPancakeStoreID: '',
   WaffoPancakeProductID: '',
   WaffoPancakeReturnURL: '',
-  WaffoPancakeCurrency: 'USD',
+  WaffoPancakeCurrency: 'CNY',
   WaffoPancakeUnitPrice: 1.0,
   WaffoPancakeMinTopUp: 1,
 };
@@ -69,7 +69,7 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
       WaffoPancakeStoreID: props.options.WaffoPancakeStoreID || '',
       WaffoPancakeProductID: props.options.WaffoPancakeProductID || '',
       WaffoPancakeReturnURL: props.options.WaffoPancakeReturnURL || '',
-      WaffoPancakeCurrency: props.options.WaffoPancakeCurrency || 'USD',
+      WaffoPancakeCurrency: props.options.WaffoPancakeCurrency || 'CNY',
       WaffoPancakeUnitPrice:
         props.options.WaffoPancakeUnitPrice !== undefined
           ? parseFloat(props.options.WaffoPancakeUnitPrice)
@@ -134,7 +134,7 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
     }
 
     if (values.WaffoPancakeEnabled && Number(values.WaffoPancakeMinTopUp) < 1) {
-      showError(t('最低充值美元数量必须大于 0'));
+      showError(t('最低充值人民币数量必须大于 0'));
       return;
     }
 
@@ -167,7 +167,7 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
         },
         {
           key: 'WaffoPancakeCurrency',
-          value: values.WaffoPancakeCurrency || 'USD',
+          value: values.WaffoPancakeCurrency || 'CNY',
         },
         {
           key: 'WaffoPancakeUnitPrice',
@@ -286,8 +286,8 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
               <Form.Input
                 field='WaffoPancakeCurrency'
                 label={t('货币')}
-                placeholder='USD'
-                extraText={t('默认使用 USD 结算')}
+                placeholder='CNY'
+                extraText={t('默认使用 CNY 结算')}
               />
             </Col>
           </Row>
@@ -384,18 +384,18 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
               <Form.InputNumber
                 field='WaffoPancakeUnitPrice'
                 precision={2}
-                label={t('充值价格（x元/美金）')}
-                placeholder={t('例如：7，就是7元/美金')}
-                extraText={t('按 1 美元对应的站内价格填写')}
+                label={t('充值价格（x元/人民币）')}
+                placeholder={t('例如：1，就是1元/人民币')}
+                extraText={t('按 1 元人民币对应的站内价格填写')}
                 min={0}
               />
             </Col>
             <Col xs={24} sm={12} md={8} lg={8} xl={8}>
               <Form.InputNumber
                 field='WaffoPancakeMinTopUp'
-                label={t('最低充值美元数量')}
-                placeholder={t('例如：2，就是最低充值2$')}
-                extraText={t('用户单次最少可充值的美元数量')}
+                label={t('最低充值人民币数量')}
+                placeholder={t('例如：2，就是最低充值 ¥2')}
+                extraText={t('用户单次最少可充值的人民币数量')}
                 min={1}
               />
             </Col>

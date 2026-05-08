@@ -19,6 +19,12 @@ type Option struct {
 	Value string `json:"value"`
 }
 
+const (
+	pricingBaseCurrencyKey    = "PricingBaseCurrency"
+	pricingBaseCurrencyCNY    = "CNY"
+	pricingBaseCurrencyLegacy = "LEGACY"
+)
+
 func AllOption() ([]*Option, error) {
 	var options []*Option
 	var err error
@@ -78,7 +84,6 @@ func InitOptionMap() {
 	common.OptionMap["EpayId"] = ""
 	common.OptionMap["EpayKey"] = ""
 	common.OptionMap["Price"] = strconv.FormatFloat(operation_setting.Price, 'f', -1, 64)
-	common.OptionMap["USDExchangeRate"] = strconv.FormatFloat(operation_setting.USDExchangeRate, 'f', -1, 64)
 	common.OptionMap["MinTopUp"] = strconv.Itoa(operation_setting.MinTopUp)
 	common.OptionMap["StripeMinTopUp"] = strconv.Itoa(setting.StripeMinTopUp)
 	common.OptionMap["StripeApiSecret"] = setting.StripeApiSecret
@@ -153,6 +158,7 @@ func InitOptionMap() {
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
 	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
 	common.OptionMap["TopUpLink"] = common.TopUpLink
+	common.OptionMap[pricingBaseCurrencyKey] = pricingBaseCurrencyLegacy
 	//common.OptionMap["ChatLink"] = common.ChatLink
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
 	common.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(common.QuotaPerUnit, 'f', -1, 64)
@@ -185,16 +191,61 @@ func InitOptionMap() {
 	}
 
 	common.OptionMapRWMutex.Unlock()
-	loadOptionsFromDatabase()
+	loadedOptionKeys := loadOptionsFromDatabase()
+	migrateLegacyPricingOptionsToCNY(loadedOptionKeys)
 }
 
-func loadOptionsFromDatabase() {
+func loadOptionsFromDatabase() map[string]struct{} {
 	options, _ := AllOption()
+	loadedKeys := make(map[string]struct{}, len(options))
 	for _, option := range options {
+		loadedKeys[option.Key] = struct{}{}
 		err := updateOptionMap(option.Key, option.Value)
 		if err != nil {
 			common.SysLog("failed to update option map: " + err.Error())
 		}
+	}
+	return loadedKeys
+}
+
+func migrateLegacyPricingOptionsToCNY(loadedOptionKeys map[string]struct{}) {
+	common.OptionMapRWMutex.RLock()
+	pricingBaseCurrency := common.OptionMap[pricingBaseCurrencyKey]
+	modelRatioValue := common.OptionMap["ModelRatio"]
+	modelPriceValue := common.OptionMap["ModelPrice"]
+	common.OptionMapRWMutex.RUnlock()
+
+	if pricingBaseCurrency == pricingBaseCurrencyCNY {
+		return
+	}
+
+	pricingOptions := map[string]string{
+		"ModelRatio": modelRatioValue,
+		"ModelPrice": modelPriceValue,
+	}
+	migrationFailed := false
+	for key, value := range pricingOptions {
+		if _, ok := loadedOptionKeys[key]; !ok {
+			continue
+		}
+		converted, err := ratio_setting.ConvertLegacyPricingJSONStringToCNY(value)
+		if err != nil {
+			common.SysLog("failed to migrate " + key + " to CNY pricing: " + err.Error())
+			migrationFailed = true
+			continue
+		}
+		if err := UpdateOption(key, converted); err != nil {
+			common.SysLog("failed to save migrated " + key + ": " + err.Error())
+			migrationFailed = true
+		}
+	}
+
+	if migrationFailed {
+		return
+	}
+
+	if err := UpdateOption(pricingBaseCurrencyKey, pricingBaseCurrencyCNY); err != nil {
+		common.SysLog("failed to save CNY pricing marker: " + err.Error())
 	}
 }
 
@@ -279,8 +330,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.LogConsumeEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
 			// 兼容旧字段：同步到新配置 general_setting.quota_display_type（运行时生效）
-			// true -> USD, false -> TOKENS
-			newVal := "USD"
+			// true -> CNY, false -> TOKENS
+			newVal := "CNY"
 			if !boolValue {
 				newVal = "TOKENS"
 			}
@@ -365,8 +416,6 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.EpayKey = value
 	case "Price":
 		operation_setting.Price, _ = strconv.ParseFloat(value, 64)
-	case "USDExchangeRate":
-		operation_setting.USDExchangeRate, _ = strconv.ParseFloat(value, 64)
 	case "MinTopUp":
 		operation_setting.MinTopUp, _ = strconv.Atoi(value)
 	case "StripeApiSecret":

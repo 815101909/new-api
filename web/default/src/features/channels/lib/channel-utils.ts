@@ -1,4 +1,4 @@
-import { formatCurrencyFromUSD, formatQuotaWithCurrency } from '@/lib/currency'
+import { formatCurrencyFromCNY, formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { formatTimestampToDate } from '@/lib/format'
 import {
@@ -285,7 +285,7 @@ export function validateChannelSettings(settings: string): boolean {
  */
 export function formatBalance(balance: number | null | undefined): string {
   if (balance == null || Number.isNaN(balance)) return '-'
-  return formatCurrencyFromUSD(balance, {
+  return formatCurrencyFromCNY(balance, {
     digitsLarge: 2,
     digitsSmall: 4,
     abbreviate: false,

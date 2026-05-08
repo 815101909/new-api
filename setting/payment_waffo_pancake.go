@@ -10,7 +10,7 @@ var (
 	WaffoPancakeStoreID          string
 	WaffoPancakeProductID        string
 	WaffoPancakeReturnURL        string
-	WaffoPancakeCurrency         string  = "USD"
+	WaffoPancakeCurrency         string  = "CNY"
 	WaffoPancakeUnitPrice        float64 = 1.0
 	WaffoPancakeMinTopUp         int     = 1
 )

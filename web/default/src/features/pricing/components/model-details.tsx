@@ -324,7 +324,6 @@ function ModelHeader(props: { model: PricingModel }) {
 function PriceSection(props: {
   model: PricingModel
   priceRate: number
-  usdExchangeRate: number
   tokenUnit: TokenUnit
   showRechargePrice: boolean
 }) {
@@ -337,7 +336,6 @@ function PriceSection(props: {
     tokenUnit: props.tokenUnit,
     showRechargePrice: props.showRechargePrice,
     priceRate: props.priceRate,
-    usdExchangeRate: props.usdExchangeRate,
     groupRatioMultiplier: 1,
   })
 
@@ -471,7 +469,6 @@ function PriceSection(props: {
               baseGroupKey,
               props.showRechargePrice,
               props.priceRate,
-              props.usdExchangeRate,
               baseGroupRatioMap
             )}
           </span>
@@ -490,7 +487,6 @@ function PriceSection(props: {
         props.tokenUnit,
         props.showRechargePrice,
         props.priceRate,
-        props.usdExchangeRate,
         baseGroupRatioMap
       )}
       <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
@@ -576,7 +572,6 @@ function GroupPricingSection(props: {
   usableGroup: Record<string, { desc: string; ratio: number }>
   autoGroups: string[]
   priceRate: number
-  usdExchangeRate: number
   tokenUnit: TokenUnit
   showRechargePrice?: boolean
 }) {
@@ -664,7 +659,6 @@ function GroupPricingSection(props: {
               tokenUnit: props.tokenUnit,
               showRechargePrice,
               priceRate: props.priceRate,
-              usdExchangeRate: props.usdExchangeRate,
               groupRatioMultiplier: 1,
             })
           )
@@ -708,7 +702,6 @@ function GroupPricingSection(props: {
                           tokenUnit: props.tokenUnit,
                           showRechargePrice,
                           priceRate: props.priceRate,
-                          usdExchangeRate: props.usdExchangeRate,
                           groupRatioMultiplier: ratio,
                         })
                         const entryMap = new Map(
@@ -803,7 +796,6 @@ function GroupPricingSection(props: {
                           props.tokenUnit,
                           showRechargePrice,
                           props.priceRate,
-                          props.usdExchangeRate,
                           props.groupRatio
                         )}
                       </TableCell>
@@ -815,7 +807,6 @@ function GroupPricingSection(props: {
                           props.tokenUnit,
                           showRechargePrice,
                           props.priceRate,
-                          props.usdExchangeRate,
                           props.groupRatio
                         )}
                       </TableCell>
@@ -831,7 +822,6 @@ function GroupPricingSection(props: {
                             props.tokenUnit,
                             showRechargePrice,
                             props.priceRate,
-                            props.usdExchangeRate,
                             props.groupRatio
                           )}
                         </TableCell>
@@ -844,7 +834,6 @@ function GroupPricingSection(props: {
                         group,
                         showRechargePrice,
                         props.priceRate,
-                        props.usdExchangeRate,
                         props.groupRatio
                       )}
                     </TableCell>
@@ -883,7 +872,6 @@ export interface ModelDetailsContentProps {
   endpointMap: Record<string, { path?: string; method?: string }>
   autoGroups: string[]
   priceRate: number
-  usdExchangeRate: number
   tokenUnit: TokenUnit
   showRechargePrice?: boolean
 }
@@ -926,7 +914,6 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
             <PriceSection
               model={props.model}
               priceRate={props.priceRate}
-              usdExchangeRate={props.usdExchangeRate}
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
@@ -939,7 +926,6 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               usableGroup={props.usableGroup}
               autoGroups={props.autoGroups}
               priceRate={props.priceRate}
-              usdExchangeRate={props.usdExchangeRate}
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
@@ -1016,7 +1002,6 @@ export function ModelDetails() {
     autoGroups,
     isLoading,
     priceRate,
-    usdExchangeRate,
   } = usePricingData()
 
   const tokenUnit: TokenUnit =
@@ -1093,7 +1078,6 @@ export function ModelDetails() {
           usableGroup={usableGroup || {}}
           autoGroups={autoGroups || []}
           priceRate={priceRate ?? 1}
-          usdExchangeRate={usdExchangeRate ?? 1}
           tokenUnit={tokenUnit}
           showRechargePrice={search.rechargePrice ?? false}
           endpointMap={

@@ -30,7 +30,6 @@ import type { PricingModel, TokenUnit } from '../types'
 export interface PricingColumnsOptions {
   tokenUnit?: TokenUnit
   priceRate?: number
-  usdExchangeRate?: number
   showRechargePrice?: boolean
 }
 
@@ -83,7 +82,6 @@ export function usePricingColumns(
   const {
     tokenUnit = DEFAULT_TOKEN_UNIT,
     priceRate = 1,
-    usdExchangeRate = 1,
     showRechargePrice = false,
   } = options
 
@@ -145,7 +143,6 @@ export function usePricingColumns(
           tokenUnit,
           showRechargePrice,
           priceRate,
-          usdExchangeRate,
           groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
         })
 
@@ -207,8 +204,7 @@ export function usePricingColumns(
               'input',
               tokenUnit,
               showRechargePrice,
-              priceRate,
-              usdExchangeRate
+              priceRate
             )
           )
           const outputPrice = stripTrailingZeros(
@@ -217,8 +213,7 @@ export function usePricingColumns(
               'output',
               tokenUnit,
               showRechargePrice,
-              priceRate,
-              usdExchangeRate
+              priceRate
             )
           )
 
@@ -240,8 +235,7 @@ export function usePricingColumns(
           formatRequestPrice(
             model,
             showRechargePrice,
-            priceRate,
-            usdExchangeRate
+            priceRate
           )
         )
 
@@ -269,7 +263,6 @@ export function usePricingColumns(
           tokenUnit,
           showRechargePrice,
           priceRate,
-          usdExchangeRate,
           groupRatioMultiplier: getDynamicDisplayGroupRatio(model),
         })
 
@@ -313,8 +306,7 @@ export function usePricingColumns(
             'cache',
             tokenUnit,
             showRechargePrice,
-            priceRate,
-            usdExchangeRate
+            priceRate
           )
         )
 

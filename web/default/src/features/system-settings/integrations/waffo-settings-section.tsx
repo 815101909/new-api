@@ -100,7 +100,7 @@ export function WaffoSettingsSection(props: Props) {
         { key: 'WaffoEnabled', value: String(values.WaffoEnabled) },
         { key: 'WaffoSandbox', value: String(values.WaffoSandbox) },
         { key: 'WaffoMerchantId', value: values.WaffoMerchantId || '' },
-        { key: 'WaffoCurrency', value: values.WaffoCurrency || 'USD' },
+        { key: 'WaffoCurrency', value: values.WaffoCurrency || 'CNY' },
         { key: 'WaffoUnitPrice', value: String(values.WaffoUnitPrice || 1) },
         { key: 'WaffoMinTopUp', value: String(values.WaffoMinTopUp || 1) },
         { key: 'WaffoNotifyUrl', value: values.WaffoNotifyUrl || '' },
@@ -285,7 +285,7 @@ export function WaffoSettingsSection(props: Props) {
             <Input {...form.register('WaffoCurrency')} disabled />
           </div>
           <div className='grid gap-1.5'>
-            <Label>{t('Unit price (USD)')}</Label>
+            <Label>{t('Unit price (payment currency / CNY credit)')}</Label>
             <Input
               type='number'
               step={0.1}

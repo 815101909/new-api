@@ -1,6 +1,6 @@
 import dayjs from '@/lib/dayjs'
 import {
-  formatCurrencyFromUSD,
+  formatCurrencyFromCNY,
   formatQuotaWithCurrency,
   getCurrencyDisplay,
 } from './currency'
@@ -32,17 +32,17 @@ export function formatPercent(value: number | null | undefined): string {
   }).format((value as number) / 100)
 }
 
-export function formatCurrencyUSD(value: number | null | undefined): string {
-  return formatCurrencyFromUSD(value == null ? null : (value as number))
+export function formatCurrencyCNY(value: number | null | undefined): string {
+  return formatCurrencyFromCNY(value == null ? null : (value as number))
 }
 
 // ============================================================================
-// Quota Formatting (500,000 units = $1)
+// Quota Formatting (500,000 units = ¥1)
 // ============================================================================
 
 /**
  * Format quota into the configured display amount.
- * Quota is stored in units where `quotaPerUnit` equals 1 USD.
+ * Quota is stored in units where `quotaPerUnit` equals ¥1.
  */
 export function formatQuota(quota: number): string {
   return formatQuotaWithCurrency(quota, {
@@ -61,10 +61,10 @@ export function formatQuotaPrecise(quota: number): string {
     return Math.round(quota).toLocaleString()
   }
 
-  const usdAmount = quota / config.quotaPerUnit
+  const cnyAmount = quota / config.quotaPerUnit
   const exchangeRate =
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
-  const amount = usdAmount * exchangeRate
+  const amount = cnyAmount * exchangeRate
 
   if (meta.kind === 'currency') {
     return new Intl.NumberFormat(undefined, {
@@ -95,9 +95,9 @@ export function parseQuotaFromDollars(amount: number): number {
   const exchangeRate =
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
 
-  const usdAmount = exchangeRate > 0 ? amount / exchangeRate : amount
+  const cnyAmount = exchangeRate > 0 ? amount / exchangeRate : amount
 
-  return Math.round(usdAmount * config.quotaPerUnit)
+  return Math.round(cnyAmount * config.quotaPerUnit)
 }
 
 /**
@@ -111,11 +111,11 @@ export function quotaUnitsToDollars(units: number): number {
     return units
   }
 
-  const usdAmount = units / config.quotaPerUnit
+  const cnyAmount = units / config.quotaPerUnit
   const exchangeRate =
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
 
-  return Number((usdAmount * exchangeRate).toFixed(6))
+  return Number((cnyAmount * exchangeRate).toFixed(6))
 }
 
 // ============================================================================

@@ -134,7 +134,7 @@ const BILLING_SECTIONS = [
           WaffoSandboxPrivateKey: settings.WaffoSandboxPrivateKey ?? '',
           WaffoSandbox: settings.WaffoSandbox ?? false,
           WaffoMerchantId: settings.WaffoMerchantId ?? '',
-          WaffoCurrency: settings.WaffoCurrency ?? 'USD',
+          WaffoCurrency: settings.WaffoCurrency ?? 'CNY',
           WaffoUnitPrice: settings.WaffoUnitPrice ?? 1,
           WaffoMinTopUp: settings.WaffoMinTopUp ?? 1,
           WaffoNotifyUrl: settings.WaffoNotifyUrl ?? '',
@@ -152,7 +152,7 @@ const BILLING_SECTIONS = [
           WaffoPancakeStoreID: settings.WaffoPancakeStoreID ?? '',
           WaffoPancakeProductID: settings.WaffoPancakeProductID ?? '',
           WaffoPancakeReturnURL: settings.WaffoPancakeReturnURL ?? '',
-          WaffoPancakeCurrency: settings.WaffoPancakeCurrency ?? 'USD',
+          WaffoPancakeCurrency: settings.WaffoPancakeCurrency ?? 'CNY',
           WaffoPancakeUnitPrice: settings.WaffoPancakeUnitPrice ?? 1,
           WaffoPancakeMinTopUp: settings.WaffoPancakeMinTopUp ?? 1,
         }}
