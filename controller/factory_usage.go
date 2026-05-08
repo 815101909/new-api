@@ -357,10 +357,8 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		"new_api_user_id":   token.UserId,
 		"new_api_username":  newApiUsername,
 		"amount_cny":        req.AmountCny,
-		"amount_usd":        req.AmountCny,
 		"quota":             quota,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": 1,
 	}
 	log := &model.Log{
 		UserId:    token.UserId,
@@ -397,9 +395,7 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		"binding":           payload,
 		"quota":             quota,
 		"amount_cny":        req.AmountCny,
-		"amount_usd":        req.AmountCny,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": 1,
 	})
 }
 
@@ -420,7 +416,6 @@ func GetFactoryUsageLogs(c *gin.Context) {
 			"bound":             false,
 			"binding":           nil,
 			"quota_per_unit":    common.QuotaPerUnit,
-			"usd_exchange_rate": 1,
 			"page":              pageInfo,
 		})
 		return
@@ -456,7 +451,6 @@ func GetFactoryUsageLogs(c *gin.Context) {
 		"bound":             true,
 		"binding":           target.Binding,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": 1,
 		"page":              pageInfo,
 	})
 }
@@ -478,10 +472,8 @@ func GetFactoryUsageStat(c *gin.Context) {
 			"rpm":               0,
 			"tpm":               0,
 			"tokens":            0,
-			"amount_usd":        0,
 			"amount_cny":        0,
 			"quota_per_unit":    common.QuotaPerUnit,
-			"usd_exchange_rate": 1,
 		})
 		return
 	}
@@ -504,9 +496,7 @@ func GetFactoryUsageStat(c *gin.Context) {
 		"rpm":               stat.Rpm,
 		"tpm":               stat.Tpm,
 		"tokens":            stat.Tokens,
-		"amount_usd":        amountCny,
 		"amount_cny":        amountCny,
 		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": 1,
 	})
 }
