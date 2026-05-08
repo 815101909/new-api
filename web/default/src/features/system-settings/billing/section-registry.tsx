@@ -92,6 +92,12 @@ const BILLING_SECTIONS = [
         groupDefaults={getGroupDefaults(settings)}
         toolPricesDefault={settings['tool_price_setting.prices']}
         visibleTabs={['models', 'tool-prices', 'upstream-sync']}
+        usdExchangeRate={settings.USDExchangeRate}
+        defaultPriceCurrency={
+          settings['general_setting.quota_display_type'] === 'CNY'
+            ? 'CNY'
+            : 'USD'
+        }
       />
     ),
   },
