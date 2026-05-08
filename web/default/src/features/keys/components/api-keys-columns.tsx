@@ -4,7 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { getUserGroups } from '@/lib/api'
-import { formatQuotaPrecise, formatTimestampToDate } from '@/lib/format'
+import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
@@ -18,6 +18,7 @@ import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
 import { getSystemOptions } from '@/features/system-settings/api'
 import { API_KEY_STATUSES } from '../constants'
+import { formatApiKeyQuotaPrecise } from '../lib/quota'
 import { type ApiKey } from '../types'
 import {
   ApiKeyCell,
@@ -172,10 +173,10 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
             <TooltipTrigger render={<div className='w-[150px] space-y-1' />}>
               <div className='flex justify-between text-xs'>
                 <span className='font-medium tabular-nums'>
-                  {formatQuotaPrecise(remaining)}
+                  {formatApiKeyQuotaPrecise(remaining)}
                 </span>
                 <span className='text-muted-foreground tabular-nums'>
-                  {formatQuotaPrecise(total)}
+                  {formatApiKeyQuotaPrecise(total)}
                 </span>
               </div>
               <Progress
@@ -186,14 +187,14 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
             <TooltipContent>
               <div className='space-y-1 text-xs'>
                 <div>
-                  {t('Used:')} {formatQuotaPrecise(used)}
+                  {t('Used:')} {formatApiKeyQuotaPrecise(used)}
                 </div>
                 <div>
-                  {t('Remaining:')} {formatQuotaPrecise(remaining)} (
+                  {t('Remaining:')} {formatApiKeyQuotaPrecise(remaining)} (
                   {percentage.toFixed(1)}%)
                 </div>
                 <div>
-                  {t('Total:')} {formatQuotaPrecise(total)}
+                  {t('Total:')} {formatApiKeyQuotaPrecise(total)}
                 </div>
               </div>
             </TooltipContent>

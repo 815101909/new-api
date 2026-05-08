@@ -112,14 +112,12 @@ const getPriceCurrencySymbol = (currency: PriceCurrency) =>
 const formatPriceWithCurrency = (
   value: string | number | undefined,
   currency: PriceCurrency,
-  usdExchangeRate: number
+  _usdExchangeRate: number
 ) => {
   const numericValue =
     typeof value === 'number' ? value : toNumberOrNull(value?.toString())
   if (numericValue === null) return ''
-  const displayValue =
-    currency === 'CNY' ? numericValue * usdExchangeRate : numericValue
-  return `${getPriceCurrencySymbol(currency)}${formatPrice(displayValue)}`
+  return `${getPriceCurrencySymbol(currency)}${formatPrice(numericValue)}`
 }
 
 const ratioToPrice = (ratio?: string, denominator?: string) => {

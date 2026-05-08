@@ -226,39 +226,35 @@ function getPriceCurrencySymbol(currency: PriceCurrency): '$' | '¥' {
 
 function convertPriceDraft(
   value: string | undefined,
-  fromCurrency: PriceCurrency,
-  toCurrency: PriceCurrency,
-  usdExchangeRate: number
+  _fromCurrency: PriceCurrency,
+  _toCurrency: PriceCurrency,
+  _usdExchangeRate: number
 ): string {
   if (!value) return ''
   const num = toNumberOrNull(value)
   if (num === null) return value
-  if (fromCurrency === toCurrency) return formatPriceDisplayNumber(num)
-  const usdValue = fromCurrency === 'CNY' ? num / usdExchangeRate : num
-  const displayValue =
-    toCurrency === 'CNY' ? usdValue * usdExchangeRate : usdValue
-  return formatPriceDisplayNumber(displayValue)
+  return formatPriceDisplayNumber(num)
 }
 
 function displayPriceToUsd(
   value: string | undefined,
-  currency: PriceCurrency,
-  usdExchangeRate: number
+  _currency: PriceCurrency,
+  _usdExchangeRate: number
 ): string {
   if (!value) return ''
   const num = toNumberOrNull(value)
   if (num === null) return value
-  return formatNumber(currency === 'CNY' ? num / usdExchangeRate : num)
+  return formatNumber(num)
 }
 
 function displayPriceToUsdNumber(
   value: string,
-  currency: PriceCurrency,
-  usdExchangeRate: number
+  _currency: PriceCurrency,
+  _usdExchangeRate: number
 ): number | null {
   const num = toNumberOrNull(value)
   if (num === null) return null
-  return currency === 'CNY' ? num / usdExchangeRate : num
+  return num
 }
 
 function formatDisplayPrice(
@@ -1065,9 +1061,7 @@ export function ModelPricingEditorPanel({
                         </FormControl>
                         <FormDescription>
                           {activePriceCurrency === 'CNY'
-                            ? t(
-                                'Cost in CNY per request, saved internally as USD.'
-                              )
+                            ? t('Cost in CNY per request.')
                             : t(
                                 'Cost in USD per request, regardless of tokens used.'
                               )}

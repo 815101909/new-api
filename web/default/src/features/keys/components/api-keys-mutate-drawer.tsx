@@ -52,11 +52,16 @@ import {
   transformFormDataToPayload,
   transformApiKeyToFormDefaults,
 } from '../lib'
-import { type ApiKey } from '../types'
+import {
+  formatApiKeyQuotaPrecise,
+  quotaUnitsToApiKeyAmount,
+} from '../lib/quota'
+import { type ApiKey, type ApiKeyQuotaAdjustMode } from '../types'
 import {
   ApiKeyGroupCombobox,
   type ApiKeyGroupOption,
 } from './api-key-group-combobox'
+import { ApiKeyQuotaDialog } from './api-key-quota-dialog'
 import { useApiKeys } from './api-keys-provider'
 
 type ApiKeyMutateDrawerProps = {
@@ -105,6 +110,10 @@ export function ApiKeysMutateDrawer({
   const { triggerRefresh } = useApiKeys()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [loadedApiKey, setLoadedApiKey] = useState<ApiKey | null>(null)
+  const [quotaDialogOpen, setQuotaDialogOpen] = useState(false)
+  const [quotaDialogMode, setQuotaDialogMode] =
+    useState<ApiKeyQuotaAdjustMode>('add')
 
   // Fetch models
   const { data: modelsData } = useQuery({
@@ -142,19 +151,38 @@ export function ApiKeysMutateDrawer({
       // For update, fetch fresh data
       getApiKey(currentRow.id).then((result) => {
         if (result.success && result.data) {
+          setLoadedApiKey(result.data)
           form.reset(transformApiKeyToFormDefaults(result.data))
         }
       })
     } else if (open && !isUpdate) {
       // For create, reset to defaults
+      setLoadedApiKey(null)
       form.reset(getApiKeyFormDefaultValues())
     }
   }, [open, isUpdate, currentRow, form])
 
+  const refreshLoadedApiKey = async () => {
+    if (!currentRow) return
+    const result = await getApiKey(currentRow.id)
+    if (result.success && result.data) {
+      setLoadedApiKey(result.data)
+      form.setValue(
+        'remain_quota_dollars',
+        quotaUnitsToApiKeyAmount(result.data.remain_quota)
+      )
+      form.setValue('unlimited_quota', result.data.unlimited_quota)
+    }
+  }
+
   const onSubmit = async (data: ApiKeyFormValues) => {
     setIsSubmitting(true)
     try {
-      const basePayload = transformFormDataToPayload(data)
+      const formPayload = transformFormDataToPayload(data)
+      const basePayload =
+        isUpdate && loadedApiKey
+          ? { ...formPayload, remain_quota: loadedApiKey.remain_quota }
+          : formPayload
 
       if (isUpdate && currentRow) {
         const result = await updateApiKey({
@@ -235,6 +263,8 @@ export function ApiKeysMutateDrawer({
       onOpenChange={(v) => {
         onOpenChange(v)
         if (!v) {
+          setLoadedApiKey(null)
+          setQuotaDialogOpen(false)
           form.reset()
         }
       }}
@@ -398,34 +428,81 @@ export function ApiKeysMutateDrawer({
               icon={WalletCards}
             >
               {!unlimitedQuota && (
-                <FormField
-                  control={form.control}
-                  name='remain_quota_dollars'
-                  render={({ field }) => (
-                    <FormItem>
+                <>
+                  {isUpdate ? (
+                    <div className='space-y-2'>
                       <FormLabel>{quotaLabel}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='number'
-                          step={tokensOnly ? 1 : 0.000001}
-                          placeholder={quotaPlaceholder}
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </FormControl>
+                      <div className='bg-muted/40 rounded-lg border px-3 py-2.5'>
+                        <div className='text-muted-foreground text-xs'>
+                          {t('Current quota')}
+                        </div>
+                        <div className='mt-1 text-lg font-semibold'>
+                          {loadedApiKey
+                            ? formatApiKeyQuotaPrecise(
+                                loadedApiKey.remain_quota
+                              )
+                            : '-'}
+                        </div>
+                      </div>
+                      <div className='grid grid-cols-2 gap-2'>
+                        <Button
+                          type='button'
+                          variant='secondary'
+                          onClick={() => {
+                            setQuotaDialogMode('add')
+                            setQuotaDialogOpen(true)
+                          }}
+                        >
+                          {t('Add Quota')}
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          onClick={() => {
+                            setQuotaDialogMode('subtract')
+                            setQuotaDialogOpen(true)
+                          }}
+                        >
+                          {t('Subtract Quota')}
+                        </Button>
+                      </div>
                       <FormDescription>
-                        {tokensOnly
-                          ? t('Enter the quota amount in tokens')
-                          : t('Enter the quota amount in {{currency}}', {
-                              currency: currencyLabel,
-                            })}
+                        {t(
+                          'Use quota adjustment to add or subtract the current API key balance.'
+                        )}
                       </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                    </div>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name='remain_quota_dollars'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{quotaLabel}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type='number'
+                              step={tokensOnly ? 1 : 0.000001}
+                              placeholder={quotaPlaceholder}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {tokensOnly
+                              ? t('Enter the quota amount in tokens')
+                              : t('Enter the quota amount in {{currency}}', {
+                                  currency: currencyLabel,
+                                })}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
+                </>
               )}
 
               <FormField
@@ -558,6 +635,16 @@ export function ApiKeysMutateDrawer({
           </Button>
         </SheetFooter>
       </SheetContent>
+      <ApiKeyQuotaDialog
+        open={quotaDialogOpen}
+        onOpenChange={setQuotaDialogOpen}
+        apiKey={loadedApiKey}
+        initialMode={quotaDialogMode}
+        onSuccess={() => {
+          triggerRefresh()
+          refreshLoadedApiKey()
+        }}
+      />
     </Sheet>
   )
 }
