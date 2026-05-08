@@ -325,6 +325,12 @@ func SetApiRouter(router *gin.Engine) {
 			factoryRoute.GET("/bindings", controller.GetFactoryBindings)
 			factoryRoute.POST("/accounts/import", controller.ImportFactoryAccounts)
 		}
+		factoryUsageRoute := apiRouter.Group("/factory/usage")
+		factoryUsageRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
+		{
+			factoryUsageRoute.GET("/logs", controller.GetFactoryUsageLogs)
+			factoryUsageRoute.GET("/stat", controller.GetFactoryUsageStat)
+		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")
 		prefillGroupRoute.Use(middleware.AdminAuth())
