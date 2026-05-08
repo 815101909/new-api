@@ -326,7 +326,7 @@ func SetApiRouter(router *gin.Engine) {
 			factoryRoute.POST("/accounts/import", controller.ImportFactoryAccounts)
 		}
 		factoryUsageRoute := apiRouter.Group("/factory/usage")
-		factoryUsageRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
+		factoryUsageRoute.Use(middleware.CORS())
 		{
 			factoryUsageRoute.POST("/bind-token", controller.BindFactoryUsageToken)
 			factoryUsageRoute.GET("/logs", controller.GetFactoryUsageLogs)
