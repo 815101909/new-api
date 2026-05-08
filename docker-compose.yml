@@ -2,7 +2,7 @@
 # 
 # Quick Start:
 #   1. docker-compose up -d
-#   2. Access at http://localhost:3000
+#   2. Access at http://localhost:3008
 #
 # Using MySQL instead of PostgreSQL:
 #   1. Comment out the postgres service and SQL_DSN line 15
@@ -21,7 +21,7 @@ services:
     restart: always
     command: --log-dir /app/logs
     ports:
-      - "3000:3000"
+      - "3008:3008"
     volumes:
       - ./data:/data
       - ./logs:/app/logs
@@ -29,10 +29,14 @@ services:
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api # ⚠️ IMPORTANT: Change the password in production!
 #      - SQL_DSN=root:123456@tcp(mysql:3306)/new-api  # Point to the mysql service, uncomment if using MySQL
       - REDIS_CONN_STRING=redis://:123456@redis:6379 # ⚠️ IMPORTANT: Change the password in production!
+      - PORT=3008
       - TZ=Asia/Shanghai
       - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)
       - BATCH_UPDATE_ENABLED=true  # 是否启用批量更新 (Whether to enable batch update)
       - NODE_NAME=new-api-node-1  # 节点名称，用于审计日志中标识节点身份；多节点/容器部署时建议设置 (Node name used in audit logs; recommended when running multiple instances or in containers)
+#      - AIGC_FACTORY_BASE_URL=http://aigc-factory-service:7001  # 创作工厂服务地址，需在共享 Docker 网络内可访问
+#      - AIGC_FACTORY_SYNC_SECRET=change-this-secret  # 必须和创作工厂 AIGC_FACTORY_NEW_API_SYNC_SECRET 保持一致
+#      - AIGC_FACTORY_PROVIDER_IDS=  # 可选，多个 New API 服务商 ID 用逗号分隔；留空由创作工厂侧匹配全部
 #      - STREAMING_TIMEOUT=300  # 流模式无响应超时时间，单位秒，默认120秒，如果出现空补全可以尝试改为更大值 （Streaming timeout in seconds, default is 120s. Increase if experiencing empty completions）
 #      - SESSION_SECRET=random_string  # 多机部署时设置，必须修改这个随机字符串！！ （multi-node deployment, set this to a random string!!!!!!!）
 #      - SYNC_FREQUENCY=60  # Uncomment if regular database syncing is needed
@@ -46,8 +50,9 @@ services:
 #      - mysql  # Uncomment if using MySQL
     networks:
       - new-api-network
+      - app_shared_net
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3008/api/status | grep -o '\"success\":\\s*true' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -96,3 +101,6 @@ volumes:
 networks:
   new-api-network:
     driver: bridge
+  app_shared_net:
+    external: true
+    name: ${APP_NETWORK_NAME:-app_shared_net}

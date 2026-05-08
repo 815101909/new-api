@@ -30,6 +30,6 @@ RUN apt-get update \
     && update-ca-certificates
 
 COPY --from=builder /build/new-api /
-EXPOSE 3000
+EXPOSE 3008
 WORKDIR /data
 ENTRYPOINT ["/new-api"]

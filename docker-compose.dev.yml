@@ -2,8 +2,8 @@
 #
 # Usage:
 #   1. docker compose -f docker-compose.dev.yml up -d
-#   2. cd web && bun install && bun run dev
-#   3. Open http://localhost:3001 (Rsbuild dev server, API auto-proxied to :3000)
+#   2. cd web/default && bun install && bun run dev
+#   3. Open http://localhost:3009 (Rsbuild dev server, API auto-proxied to :3008)
 #
 # Rebuild backend after Go code changes:
 #   docker compose -f docker-compose.dev.yml up -d --build new-api
@@ -23,14 +23,18 @@ services:
     container_name: new-api-dev
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3008:3008"
     volumes:
       - dev_data:/data
     environment:
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api
       - REDIS_CONN_STRING=redis://redis
+      - PORT=3008
       - TZ=Asia/Shanghai
       - BATCH_UPDATE_ENABLED=true
+#      - AIGC_FACTORY_BASE_URL=http://aigc-factory-service:7001
+#      - AIGC_FACTORY_SYNC_SECRET=change-this-secret
+#      - AIGC_FACTORY_PROVIDER_IDS=
     depends_on:
       redis:
         condition: service_started

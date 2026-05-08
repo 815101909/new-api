@@ -89,17 +89,18 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    port: 3009,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3008',
         changeOrigin: true,
       },
       '/mj': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3008',
         changeOrigin: true,
       },
       '/pg': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3008',
         changeOrigin: true,
       },
     },
