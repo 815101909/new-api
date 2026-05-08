@@ -82,6 +82,8 @@ type ModelRow = {
 }
 
 const STORAGE_KEY = 'model-ratio-column-visibility'
+const PRICE_DISPLAY_DECIMALS = 5
+const PRICE_INTERNAL_DECIMALS = 12
 
 const hasValue = (value?: string) => value !== undefined && value !== ''
 
@@ -92,7 +94,11 @@ const toNumberOrNull = (value?: string) => {
 }
 
 const formatPrice = (value: number) => {
-  return Number.parseFloat(value.toFixed(12)).toString()
+  return Number.parseFloat(value.toFixed(PRICE_DISPLAY_DECIMALS)).toString()
+}
+
+const formatInternalPrice = (value: number) => {
+  return Number.parseFloat(value.toFixed(PRICE_INTERNAL_DECIMALS)).toString()
 }
 
 const getSafeExchangeRate = (value: unknown) => {
@@ -120,7 +126,7 @@ const ratioToPrice = (ratio?: string, denominator?: string) => {
   const ratioNumber = toNumberOrNull(ratio)
   const denominatorNumber = denominator ? toNumberOrNull(denominator) : 2
   if (ratioNumber === null || denominatorNumber === null) return ''
-  return formatPrice(ratioNumber * denominatorNumber)
+  return formatInternalPrice(ratioNumber * denominatorNumber)
 }
 
 const filterBySelectedValues = (

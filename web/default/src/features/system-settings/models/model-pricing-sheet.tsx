@@ -118,6 +118,7 @@ type PreviewRow = {
 }
 
 const numericDraftRegex = /^(\d+(\.\d*)?|\.\d*)?$/
+const PRICE_DISPLAY_DECIMALS = 5
 
 const EMPTY_LANE_PRICES: Record<LaneKey, string> = {
   completion: '',
@@ -208,6 +209,12 @@ function formatNumber(value: unknown): string {
   return Number.parseFloat(num.toFixed(12)).toString()
 }
 
+function formatPriceDisplayNumber(value: unknown): string {
+  const num = toNumberOrNull(value)
+  if (num === null) return ''
+  return Number.parseFloat(num.toFixed(PRICE_DISPLAY_DECIMALS)).toString()
+}
+
 function getSafeExchangeRate(value: unknown): number {
   const rate = Number(value)
   return Number.isFinite(rate) && rate > 0 ? rate : 7
@@ -223,13 +230,14 @@ function convertPriceDraft(
   toCurrency: PriceCurrency,
   usdExchangeRate: number
 ): string {
-  if (!value || fromCurrency === toCurrency) return value || ''
+  if (!value) return ''
   const num = toNumberOrNull(value)
   if (num === null) return value
+  if (fromCurrency === toCurrency) return formatPriceDisplayNumber(num)
   const usdValue = fromCurrency === 'CNY' ? num / usdExchangeRate : num
   const displayValue =
     toCurrency === 'CNY' ? usdValue * usdExchangeRate : usdValue
-  return formatNumber(displayValue)
+  return formatPriceDisplayNumber(displayValue)
 }
 
 function displayPriceToUsd(
@@ -258,7 +266,10 @@ function formatDisplayPrice(
   currency: PriceCurrency,
   t: (key: string) => string
 ): string {
-  return value ? `${getPriceCurrencySymbol(currency)}${value}` : t('Empty')
+  const displayValue = formatPriceDisplayNumber(value)
+  return displayValue
+    ? `${getPriceCurrencySymbol(currency)}${displayValue}`
+    : t('Empty')
 }
 
 function ratioToBasePrice(ratio: unknown): string {
