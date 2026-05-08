@@ -53,6 +53,33 @@ export function formatQuota(quota: number): string {
 }
 
 /**
+ * Format quota with six decimal places of precision for balance editing.
+ */
+export function formatQuotaPrecise(quota: number): string {
+  const { config, meta } = getCurrencyDisplay()
+  if (meta.kind === 'tokens') {
+    return Math.round(quota).toLocaleString()
+  }
+
+  const usdAmount = quota / config.quotaPerUnit
+  const exchangeRate =
+    meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
+  const amount = usdAmount * exchangeRate
+
+  if (meta.kind === 'currency') {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: meta.currencyCode,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    }).format(amount)
+  }
+
+  return `${meta.symbol}${amount.toFixed(6)}`
+}
+
+/**
  * Parse quota from the current display input back to quota units.
  */
 export function parseQuotaFromDollars(amount: number): number {
@@ -88,7 +115,7 @@ export function quotaUnitsToDollars(units: number): number {
   const exchangeRate =
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
 
-  return Number((usdAmount * exchangeRate).toFixed(2))
+  return Number((usdAmount * exchangeRate).toFixed(6))
 }
 
 // ============================================================================

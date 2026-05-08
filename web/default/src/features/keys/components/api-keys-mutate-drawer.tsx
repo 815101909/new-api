@@ -408,7 +408,7 @@ export function ApiKeysMutateDrawer({
                         <Input
                           {...field}
                           type='number'
-                          step={tokensOnly ? 1 : 0.01}
+                          step={tokensOnly ? 1 : 0.000001}
                           placeholder={quotaPlaceholder}
                           onChange={(e) =>
                             field.onChange(parseFloat(e.target.value) || 0)

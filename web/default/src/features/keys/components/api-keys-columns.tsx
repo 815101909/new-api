@@ -4,7 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { getUserGroups } from '@/lib/api'
-import { formatQuota, formatTimestampToDate } from '@/lib/format'
+import { formatQuotaPrecise, formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
@@ -172,10 +172,10 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
             <TooltipTrigger render={<div className='w-[150px] space-y-1' />}>
               <div className='flex justify-between text-xs'>
                 <span className='font-medium tabular-nums'>
-                  {formatQuota(remaining)}
+                  {formatQuotaPrecise(remaining)}
                 </span>
                 <span className='text-muted-foreground tabular-nums'>
-                  {formatQuota(total)}
+                  {formatQuotaPrecise(total)}
                 </span>
               </div>
               <Progress
@@ -186,14 +186,14 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
             <TooltipContent>
               <div className='space-y-1 text-xs'>
                 <div>
-                  {t('Used:')} {formatQuota(used)}
+                  {t('Used:')} {formatQuotaPrecise(used)}
                 </div>
                 <div>
-                  {t('Remaining:')} {formatQuota(remaining)} (
+                  {t('Remaining:')} {formatQuotaPrecise(remaining)} (
                   {percentage.toFixed(1)}%)
                 </div>
                 <div>
-                  {t('Total:')} {formatQuota(total)}
+                  {t('Total:')} {formatQuotaPrecise(total)}
                 </div>
               </div>
             </TooltipContent>

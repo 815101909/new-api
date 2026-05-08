@@ -15,7 +15,7 @@ import {
 import { Database } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { formatQuota } from '@/lib/format'
+import { formatQuotaPrecise } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import {
@@ -154,10 +154,10 @@ function ApiKeysMobileList({
                 <span className='font-medium'>{t('Unlimited')}</span>
               ) : (
                 <span className='font-medium tabular-nums'>
-                  {formatQuota(apiKey.remain_quota)}
+                  {formatQuotaPrecise(apiKey.remain_quota)}
                   <span className='text-muted-foreground font-normal'>
                     {' / '}
-                    {formatQuota(total)}
+                    {formatQuotaPrecise(total)}
                   </span>
                 </span>
               )}
