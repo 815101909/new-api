@@ -204,6 +204,33 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
       meta: { label: t('Quota') },
     },
     {
+      id: 'used_quota',
+      accessorKey: 'used_quota',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Consume')} />
+      ),
+      cell: ({ row }) => {
+        const apiKey = row.original
+        const used = apiKey.used_quota
+        const total = apiKey.used_quota + apiKey.remain_quota
+        const percentage = total > 0 ? (used / total) * 100 : 0
+
+        return (
+          <div className='flex min-w-[110px] flex-col gap-0.5'>
+            <span className='font-mono text-xs font-medium tabular-nums'>
+              {formatApiKeyQuotaPrecise(used)}
+            </span>
+            <span className='text-muted-foreground text-[11px]'>
+              {apiKey.unlimited_quota
+                ? t('Unlimited')
+                : `${percentage.toFixed(1)}%`}
+            </span>
+          </div>
+        )
+      },
+      meta: { label: t('Consume'), mobileHidden: true },
+    },
+    {
       accessorKey: 'group',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t('Group')} />
