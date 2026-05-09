@@ -692,7 +692,10 @@ export const modelColorMap = {
   'text-davinci-003': 'rgb(219,112,147)', // 苍紫罗兰色（与Curie相同，表示同一个系列）
   'text-davinci-edit-001': 'rgb(255,105,180)', // 热粉色
   'text-embedding-ada-002': 'rgb(255,182,193)', // 浅粉红
+  'text-embedding-v4': 'rgb(255,170,180)', // 浅粉红色
+  'text-embedding-v3': 'rgb(255,172,182)', // 浅粉红色（略有区别）
   'text-embedding-v1': 'rgb(255,174,185)', // 浅粉红色（略有区别）
+  'qwen3-rerank': 'rgb(255,166,176)', // 浅粉红色（重排）
   'text-moderation-latest': 'rgb(255,130,171)', // 强粉色
   'text-moderation-stable': 'rgb(255,160,122)', // 浅珊瑚色（与Babbage相同，表示同一类功能）
   'tts-1': 'rgb(255,140,0)', // 深橙色

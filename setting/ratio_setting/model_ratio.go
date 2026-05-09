@@ -230,7 +230,11 @@ var defaultModelRatio = convertLegacyPricingMapToCNY(map[string]float64{
 	"glm-4v-plus":                               0.01 * cnySourceRatioBase,
 	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
 	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
+	"text-embedding-v4":                         0.0343, // ￥0.0005 / 1k tokens
+	"text-embedding-v3":                         0.0343, // ￥0.0005 / 1k tokens
 	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
+	"qwen3-rerank":                              0.0343, // ￥0.0005 / 1k tokens
+	"gte-rerank-v2":                             0.0548, // ￥0.0008 / 1k tokens
 	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
