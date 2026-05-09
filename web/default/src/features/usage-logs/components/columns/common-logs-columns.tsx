@@ -37,6 +37,7 @@ import {
   getLogTypeConfig,
   isPerCallBilling,
 } from '../../lib/utils'
+import { LOG_TYPE_ENUM } from '../../constants'
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
 import { ModelBadge } from '../model-badge'
@@ -676,9 +677,22 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       ),
       cell: ({ row }) => {
         const log = row.original
+        const quota = row.getValue('quota') as number
+
+        if (log.type === LOG_TYPE_ENUM.TOPUP) {
+          const quotaStr = formatLogQuota(quota)
+
+          return (
+            <div className='flex flex-col gap-0.5'>
+              <span className='inline-flex w-fit items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-emerald-700 tabular-nums dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'>
+                +{quotaStr}
+              </span>
+            </div>
+          )
+        }
+
         if (!isDisplayableLogType(log.type)) return null
 
-        const quota = row.getValue('quota') as number
         const other = parseLogOther(log.other)
         const isSubscription = other?.billing_source === 'subscription'
 
