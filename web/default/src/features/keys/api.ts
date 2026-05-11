@@ -6,6 +6,7 @@ import type {
   GetApiKeysResponse,
   SearchApiKeysParams,
   ApiKeyFormData,
+  ApiKeyQuotaAdjustPayload,
 } from './types'
 
 // ============================================================================
@@ -54,6 +55,17 @@ export async function updateApiKey(
   data: ApiKeyFormData & { id: number }
 ): Promise<ApiResponse<ApiKey>> {
   const res = await api.put('/api/token/', data)
+  return res.data
+}
+
+// Adjust API key quota (add/subtract/override)
+export async function adjustApiKeyQuota(
+  payload: ApiKeyQuotaAdjustPayload
+): Promise<ApiResponse<ApiKey>> {
+  const res = await api.post(`/api/token/${payload.id}/quota`, {
+    mode: payload.mode,
+    value: payload.value,
+  })
   return res.data
 }
 

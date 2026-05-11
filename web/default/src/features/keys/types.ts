@@ -76,6 +76,14 @@ export interface ApiKeyFormData {
   cross_group_retry: boolean
 }
 
+export type ApiKeyQuotaAdjustMode = 'add' | 'subtract' | 'override'
+
+export interface ApiKeyQuotaAdjustPayload {
+  id: number
+  mode: ApiKeyQuotaAdjustMode
+  value: number
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================
@@ -83,6 +91,7 @@ export interface ApiKeyFormData {
 export type ApiKeysDialogType =
   | 'create'
   | 'update'
+  | 'quota'
   | 'delete'
   | 'batch-delete'
   | 'cc-switch'

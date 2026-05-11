@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
@@ -318,6 +319,102 @@ func UpdateToken(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    buildMaskedTokenResponse(cleanToken),
+	})
+}
+
+type TokenQuotaAdjustRequest struct {
+	Mode  string `json:"mode"`
+	Value int    `json:"value"`
+}
+
+func AdjustTokenQuota(c *gin.Context) {
+	userId := c.GetInt("id")
+	tokenId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	req := TokenQuotaAdjustRequest{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	token, err := model.GetTokenByIds(tokenId, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if token.UnlimitedQuota {
+		common.ApiErrorMsg(c, "无限额度令牌无需调整额度")
+		return
+	}
+
+	oldQuota := token.RemainQuota
+	maxQuotaValue := getMaxTokenQuotaValue()
+	switch req.Mode {
+	case "add":
+		if req.Value <= 0 {
+			common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
+			return
+		}
+		if token.RemainQuota > maxQuotaValue-req.Value {
+			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
+			return
+		}
+		token.RemainQuota += req.Value
+	case "subtract":
+		if req.Value <= 0 {
+			common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
+			return
+		}
+		if token.RemainQuota < req.Value {
+			common.ApiErrorMsg(c, "减少额度不能超过当前剩余额度")
+			return
+		}
+		token.RemainQuota -= req.Value
+	case "override":
+		if req.Value < 0 {
+			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
+			return
+		}
+		if req.Value > maxQuotaValue {
+			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
+			return
+		}
+		token.RemainQuota = req.Value
+	default:
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	if token.Status == common.TokenStatusExhausted && token.RemainQuota > 0 {
+		token.Status = common.TokenStatusEnabled
+	}
+	if token.Status == common.TokenStatusEnabled && token.RemainQuota <= 0 {
+		token.Status = common.TokenStatusExhausted
+	}
+	if err := token.Update(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	content := ""
+	switch req.Mode {
+	case "add":
+		content = fmt.Sprintf("增加 API 令牌 %s 额度 %s", token.Name, logger.LogQuota(req.Value))
+	case "subtract":
+		content = fmt.Sprintf("减少 API 令牌 %s 额度 %s", token.Name, logger.LogQuota(req.Value))
+	case "override":
+		content = fmt.Sprintf("覆盖 API 令牌 %s 额度从 %s 为 %s", token.Name, logger.LogQuota(oldQuota), logger.LogQuota(req.Value))
+	}
+	model.RecordLog(userId, model.LogTypeManage, content)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    buildMaskedTokenResponse(token),
 	})
 }
 

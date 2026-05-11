@@ -8,6 +8,7 @@ import {
   ExternalLink,
   ArrowRightLeft,
   Copy,
+  Coins,
   Link,
   Loader2,
   MoreHorizontal as DotsHorizontalIcon,
@@ -236,6 +237,18 @@ export function DataTableRowActions<TData>({
             {t('Edit')}
             <DropdownMenuShortcut>
               <Edit size={16} />
+            </DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={apiKey.unlimited_quota}
+            onClick={() => {
+              setCurrentRow(apiKey)
+              setOpen('quota')
+            }}
+          >
+            {t('Adjust Quota')}
+            <DropdownMenuShortcut>
+              <Coins size={16} />
             </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
