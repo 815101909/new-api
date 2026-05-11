@@ -331,6 +331,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			factoryUsageRoute.POST("/bind-token", controller.BindFactoryUsageToken)
 			factoryUsageRoute.POST("/topup-token", controller.TopupFactoryUsageToken)
+			factoryUsageRoute.GET("/channels", controller.GetFactoryUsageChannels)
 			factoryUsageRoute.GET("/logs", controller.GetFactoryUsageLogs)
 			factoryUsageRoute.GET("/stat", controller.GetFactoryUsageStat)
 		}

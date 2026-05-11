@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+const defaultFactorySyncSecret = "dev-new-api-sync-secret"
+
+func getFactorySyncSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_NEW_API_SYNC_SECRET")); secret != "" {
+		return secret
+	}
+	if secret := strings.TrimSpace(os.Getenv("AIGC_FACTORY_SYNC_SECRET")); secret != "" {
+		return secret
+	}
+	return defaultFactorySyncSecret
+}
 
 func validUserInfo(username string, role int) bool {
 	// check username is empty
@@ -434,6 +447,17 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 			abortWithOpenAiMessage(c, http.StatusForbidden, "普通用户不支持指定渠道")
 			return fmt.Errorf("普通用户不支持指定渠道")
 		}
+		return nil
+	}
+
+	factoryChannelId := strings.TrimSpace(c.GetHeader("X-AIGC-Factory-Channel-Id"))
+	if factoryChannelId != "" {
+		if strings.TrimSpace(c.GetHeader("X-New-API-Sync-Secret")) != getFactorySyncSecret() {
+			abortWithOpenAiMessage(c, http.StatusForbidden, "无权指定渠道")
+			return fmt.Errorf("无权指定渠道")
+		}
+		c.Set("specific_channel_id", factoryChannelId)
+		c.Set("factory_specific_channel", true)
 	}
 	return nil
 }

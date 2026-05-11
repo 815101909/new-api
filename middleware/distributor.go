@@ -51,6 +51,41 @@ func Distribute() func(c *gin.Context) {
 				abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
 				return
 			}
+			if factorySpecific, _ := c.Get("factory_specific_channel"); factorySpecific == true {
+				if modelRequest.Model == "" {
+					abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorModelNameRequired))
+					return
+				}
+
+				modelLimitEnable := common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled)
+				if modelLimitEnable {
+					s, hasLimit := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
+					if !hasLimit {
+						abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorTokenNoModelAccess))
+						return
+					}
+					tokenModelLimit, ok := s.(map[string]bool)
+					if !ok {
+						tokenModelLimit = map[string]bool{}
+					}
+					matchName := ratio_setting.FormatMatchingModelName(modelRequest.Model)
+					if _, hasAccess := tokenModelLimit[matchName]; !hasAccess {
+						abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorTokenModelForbidden, map[string]any{"Model": modelRequest.Model}))
+						return
+					}
+				}
+
+				usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+				channelEnabled := model.IsChannelEnabledForGroupModel(usingGroup, modelRequest.Model, channel.Id)
+				if usingGroup == "auto" {
+					userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+					channelEnabled = model.IsChannelEnabledForAnyGroupModel(service.GetUserAutoGroup(userGroup), modelRequest.Model, channel.Id)
+				}
+				if !channelEnabled {
+					abortWithOpenAiMessage(c, http.StatusForbidden, "指定渠道不支持当前模型或当前分组无权使用该渠道")
+					return
+				}
+			}
 		} else {
 			// Select a channel for the user
 			// check token model mapping

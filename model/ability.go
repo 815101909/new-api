@@ -28,6 +28,14 @@ type AbilityWithChannel struct {
 	ChannelType int `json:"channel_type"`
 }
 
+type EnabledChannelModel struct {
+	ChannelId   int     `json:"channel_id"`
+	ChannelName string  `json:"channel_name"`
+	ChannelType int     `json:"channel_type"`
+	ChannelTag  *string `json:"channel_tag"`
+	Model       string  `json:"model"`
+}
+
 func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 	var abilities []AbilityWithChannel
 	err := DB.Table("abilities").
@@ -36,6 +44,16 @@ func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 		Where("abilities.enabled = ?", true).
 		Scan(&abilities).Error
 	return abilities, err
+}
+
+func GetEnabledChannelModelsByGroup(group string) ([]EnabledChannelModel, error) {
+	var rows []EnabledChannelModel
+	err := DB.Table("abilities").
+		Select("abilities.channel_id as channel_id, channels.name as channel_name, channels.type as channel_type, channels.tag as channel_tag, abilities.model as model").
+		Joins("left join channels on abilities.channel_id = channels.id").
+		Where("abilities."+commonGroupCol+" = ? AND abilities.enabled = ? AND channels.status = ?", group, true, common.ChannelStatusEnabled).
+		Scan(&rows).Error
+	return rows, err
 }
 
 func GetGroupEnabledModels(group string) []string {

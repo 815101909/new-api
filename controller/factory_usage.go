@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -77,6 +80,15 @@ type factoryUsageOverviewPayload struct {
 	Tpm                int                                  `json:"tpm"`
 	Daily              []factoryUsageOverviewDailyItem      `json:"daily"`
 	ModelShare         []factoryUsageOverviewModelShareItem `json:"model_share"`
+}
+
+type factoryUsageChannelPayload struct {
+	ChannelId       int      `json:"channel_id"`
+	ChannelName     string   `json:"channel_name"`
+	ChannelType     int      `json:"channel_type"`
+	ChannelTypeName string   `json:"channel_type_name"`
+	Tag             string   `json:"tag"`
+	Models          []string `json:"models"`
 }
 
 const defaultFactoryUsageSyncSecret = "dev-new-api-sync-secret"
@@ -219,6 +231,172 @@ func assertFactoryUsageSecret(c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+func normalizeFactoryUsageTokenKey(raw string) string {
+	key := strings.TrimSpace(raw)
+	if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
+		key = strings.TrimSpace(key[7:])
+	}
+	key = strings.TrimPrefix(key, "sk-")
+	parts := strings.Split(key, "-")
+	return strings.TrimSpace(parts[0])
+}
+
+func getFactoryUsageToken(c *gin.Context) (*model.Token, *model.UserBase, []string, bool) {
+	key := normalizeFactoryUsageTokenKey(c.GetHeader("Authorization"))
+	if key == "" {
+		common.ApiErrorMsg(c, "New API 令牌不能为空")
+		return nil, nil, nil, false
+	}
+
+	token, err := model.ValidateUserToken(key)
+	if err != nil || token == nil {
+		common.ApiErrorMsg(c, "New API 令牌无效或已过期")
+		return nil, nil, nil, false
+	}
+
+	userCache, err := model.GetUserCache(token.UserId)
+	if err != nil {
+		common.ApiError(c, err)
+		return nil, nil, nil, false
+	}
+	if userCache.Status != common.UserStatusEnabled {
+		common.ApiErrorMsg(c, "New API 账号已被禁用")
+		return nil, nil, nil, false
+	}
+
+	userGroup := userCache.Group
+	usingGroup := userGroup
+	tokenGroup := strings.TrimSpace(token.Group)
+	if tokenGroup != "" {
+		if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
+			common.ApiErrorMsg(c, fmt.Sprintf("无权访问 %s 分组", tokenGroup))
+			return nil, nil, nil, false
+		}
+		if tokenGroup != "auto" && !ratio_setting.ContainsGroupRatio(tokenGroup) {
+			common.ApiErrorMsg(c, fmt.Sprintf("分组 %s 已被弃用", tokenGroup))
+			return nil, nil, nil, false
+		}
+		usingGroup = tokenGroup
+	}
+
+	groups := []string{usingGroup}
+	if usingGroup == "auto" {
+		autoGroups := service.GetUserAutoGroup(userGroup)
+		if len(autoGroups) == 0 {
+			common.ApiErrorMsg(c, "当前令牌未配置可用的 auto 分组")
+			return nil, nil, nil, false
+		}
+		groups = autoGroups
+	}
+
+	return token, userCache, groups, true
+}
+
+func factoryTokenAllowsModel(token *model.Token, modelName string) bool {
+	if token == nil || !token.ModelLimitsEnabled {
+		return true
+	}
+	modelLimits := token.GetModelLimitsMap()
+	if len(modelLimits) == 0 {
+		return false
+	}
+	matchName := ratio_setting.FormatMatchingModelName(modelName)
+	if modelLimits[modelName] {
+		return true
+	}
+	if matchName != "" && matchName != modelName && modelLimits[matchName] {
+		return true
+	}
+	return false
+}
+
+func GetFactoryUsageChannels(c *gin.Context) {
+	if !assertFactoryUsageSecret(c) {
+		return
+	}
+
+	token, _, groups, ok := getFactoryUsageToken(c)
+	if !ok {
+		return
+	}
+
+	channelMap := make(map[int]*factoryUsageChannelPayload)
+	for _, group := range groups {
+		rows, err := model.GetEnabledChannelModelsByGroup(group)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		for _, row := range rows {
+			modelName := strings.TrimSpace(row.Model)
+			if modelName == "" || !factoryTokenAllowsModel(token, modelName) {
+				continue
+			}
+			channel, exists := channelMap[row.ChannelId]
+			if !exists {
+				tag := ""
+				if row.ChannelTag != nil {
+					tag = strings.TrimSpace(*row.ChannelTag)
+				}
+				channel = &factoryUsageChannelPayload{
+					ChannelId:       row.ChannelId,
+					ChannelName:     strings.TrimSpace(row.ChannelName),
+					ChannelType:     row.ChannelType,
+					ChannelTypeName: constant.GetChannelTypeName(row.ChannelType),
+					Tag:             tag,
+					Models:          make([]string, 0, 8),
+				}
+				channelMap[row.ChannelId] = channel
+			}
+			duplicate := false
+			for _, existingModel := range channel.Models {
+				if existingModel == modelName {
+					duplicate = true
+					break
+				}
+			}
+			if duplicate {
+				continue
+			}
+			channel.Models = append(channel.Models, modelName)
+		}
+	}
+
+	channels := make([]factoryUsageChannelPayload, 0, len(channelMap))
+	for _, item := range channelMap {
+		sort.Strings(item.Models)
+		if len(item.Models) == 0 {
+			continue
+		}
+		if item.ChannelName == "" {
+			item.ChannelName = fmt.Sprintf("Channel #%d", item.ChannelId)
+		}
+		channels = append(channels, *item)
+	}
+
+	sort.Slice(channels, func(i int, j int) bool {
+		if channels[i].ChannelType == channels[j].ChannelType {
+			if channels[i].ChannelName == channels[j].ChannelName {
+				return channels[i].ChannelId < channels[j].ChannelId
+			}
+			return channels[i].ChannelName < channels[j].ChannelName
+		}
+		return channels[i].ChannelTypeName < channels[j].ChannelTypeName
+	})
+
+	totalModels := 0
+	for _, item := range channels {
+		totalModels += len(item.Models)
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"channels":     channels,
+		"groups":       groups,
+		"count":        len(channels),
+		"total_models": totalModels,
+	})
 }
 
 func parseFactoryUsageTimestamp(value string) int64 {
