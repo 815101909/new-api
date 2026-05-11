@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,8 @@ type AliVideoRequest struct {
 type AliVideoInput struct {
 	Prompt         string `json:"prompt,omitempty"`          // 文本提示词
 	ImgURL         string `json:"img_url,omitempty"`         // 首帧图像URL或Base64（图生视频）
+	ImageURL       string `json:"image_url,omitempty"`       // 角色替换/角色动画输入图片
+	VideoURL       string `json:"video_url,omitempty"`       // 参考生视频/视频编辑输入视频
 	FirstFrameURL  string `json:"first_frame_url,omitempty"` // 首帧图片URL（首尾帧生视频）
 	LastFrameURL   string `json:"last_frame_url,omitempty"`  // 尾帧图片URL（首尾帧生视频）
 	AudioURL       string `json:"audio_url,omitempty"`       // 音频URL（wan2.5支持）
@@ -48,6 +51,7 @@ type AliVideoInput struct {
 type AliVideoParameters struct {
 	Resolution   string `json:"resolution,omitempty"`    // 分辨率: 480P/720P/1080P（图生视频、首尾帧生视频）
 	Size         string `json:"size,omitempty"`          // 尺寸: 如 "832*480"（文生视频）
+	Mode         string `json:"mode,omitempty"`          // 模式: wan-std/wan-pro（角色动画）
 	Duration     int    `json:"duration,omitempty"`      // 时长: 3-10秒
 	PromptExtend bool   `json:"prompt_extend,omitempty"` // 是否开启prompt智能改写
 	Watermark    bool   `json:"watermark,omitempty"`     // 是否添加水印
@@ -80,9 +84,11 @@ type AliVideoOutput struct {
 
 // AliUsage 使用统计
 type AliUsage struct {
-	Duration   dto.IntValue `json:"duration,omitempty"`
-	VideoCount dto.IntValue `json:"video_count,omitempty"`
-	SR         dto.IntValue `json:"SR,omitempty"`
+	Duration            float64 `json:"duration,omitempty"`
+	InputVideoDuration  float64 `json:"input_video_duration,omitempty"`
+	OutputVideoDuration float64 `json:"output_video_duration,omitempty"`
+	VideoCount          int     `json:"video_count,omitempty"`
+	SR                  int     `json:"SR,omitempty"`
 }
 
 type AliMetadata struct {
@@ -190,62 +196,100 @@ func sizeToResolution(size string) (string, error) {
 	return "", fmt.Errorf("invalid size: %s", size)
 }
 
-func ProcessAliOtherRatios(aliReq *AliVideoRequest) (map[string]float64, error) {
-	otherRatios := make(map[string]float64)
-	aliRatios := map[string]map[string]float64{
-		"wan2.6-i2v": {
-			"720P":  1,
-			"1080P": 1 / 0.6,
-		},
-		"wan2.5-t2v-preview": {
-			"480P":  1,
-			"720P":  2,
-			"1080P": 1 / 0.3,
-		},
-		"wan2.2-t2v-plus": {
-			"480P":  1,
-			"1080P": 0.7 / 0.14,
-		},
-		"wan2.5-i2v-preview": {
-			"480P":  1,
-			"720P":  2,
-			"1080P": 1 / 0.3,
-		},
-		"wan2.2-i2v-plus": {
-			"480P":  1,
-			"1080P": 0.7 / 0.14,
-		},
-		"wan2.2-kf2v-flash": {
-			"480P":  1,
-			"720P":  2,
-			"1080P": 4.8,
-		},
-		"wan2.2-i2v-flash": {
-			"480P": 1,
-			"720P": 2,
-		},
+func aliResolutionRatios(model string) map[string]float64 {
+	switch model {
+	case "wan2.7-t2v", "wan2.7-t2v-2026-04-25", "wan2.7-i2v", "wan2.7-i2v-2026-04-25", "wan2.7-r2v", "wan2.7-videoedit",
+		"wan2.6-t2v", "wan2.6-i2v", "wan2.6-r2v":
+		return map[string]float64{"720P": 1, "1080P": 1 / 0.6}
+	case "wan2.6-i2v-flash", "wan2.6-r2v-flash":
+		return map[string]float64{"720P": 1, "1080P": 0.25 / 0.15}
+	case "wan2.5-t2v-preview", "wan2.5-i2v-preview":
+		return map[string]float64{"480P": 1, "720P": 2, "1080P": 1 / 0.3}
+	case "wan2.2-t2v-plus", "wan2.2-i2v-plus":
+		return map[string]float64{"480P": 1, "1080P": 0.7 / 0.14}
+	case "wan2.2-i2v-flash", "wan2.2-kf2v-flash":
+		return map[string]float64{"480P": 1, "720P": 2, "1080P": 4.8}
+	case "wanx2.1-t2v-plus", "wanx2.1-i2v-plus", "wanx2.1-kf2v-plus", "wanx2.1-vace-plus":
+		return map[string]float64{"720P": 1}
+	case "wanx2.1-t2v-turbo", "wanx2.1-i2v-turbo":
+		return map[string]float64{"480P": 1, "720P": 1}
+	case "happyhorse-1.0-t2v", "happyhorse-1.0-i2v", "happyhorse-1.0-r2v", "happyhorse-1.0-video-edit":
+		return map[string]float64{"720P": 1, "1080P": 1.6 / 0.9}
+	default:
+		return nil
 	}
-	var resolution string
+}
 
-	// size match
+func aliModeRatios(model string) map[string]float64 {
+	switch model {
+	case "wan2.2-animate-move":
+		return map[string]float64{"WAN-STD": 1, "WAN-PRO": 0.6 / 0.4}
+	case "wan2.2-animate-mix":
+		return map[string]float64{"WAN-STD": 1, "WAN-PRO": 0.9 / 0.6}
+	default:
+		return nil
+	}
+}
+
+func normalizeAliResolution(resolution string) string {
+	resolution = strings.ToUpper(strings.TrimSpace(resolution))
+	if resolution == "" {
+		return ""
+	}
+	if !strings.HasSuffix(resolution, "P") {
+		resolution += "P"
+	}
+	return resolution
+}
+
+func normalizeAliMode(mode string) string {
+	mode = strings.ToUpper(strings.TrimSpace(mode))
+	if mode == "" {
+		return ""
+	}
+	return mode
+}
+
+func aliOtherRatiosForRequest(modelName, resolution, mode string, audio *bool) map[string]float64 {
+	otherRatios := make(map[string]float64)
+	if resolutionRatios := aliResolutionRatios(modelName); resolutionRatios != nil {
+		if ratio, ok := resolutionRatios[normalizeAliResolution(resolution)]; ok {
+			otherRatios[fmt.Sprintf("resolution-%s", normalizeAliResolution(resolution))] = ratio
+		}
+	}
+	if modeRatios := aliModeRatios(modelName); modeRatios != nil {
+		if ratio, ok := modeRatios[normalizeAliMode(mode)]; ok {
+			otherRatios[fmt.Sprintf("mode-%s", strings.ToLower(normalizeAliMode(mode)))] = ratio
+		}
+	}
+	if audio != nil && *audio {
+		switch modelName {
+		case "wan2.6-i2v-flash", "wan2.6-r2v-flash":
+			otherRatios["audio-true"] = 2
+		}
+	}
+	return otherRatios
+}
+
+func aliResolutionFromRequest(aliReq *AliVideoRequest) (string, error) {
+	if aliReq.Parameters == nil {
+		return "", nil
+	}
 	if aliReq.Parameters.Size != "" {
-		toResolution, err := sizeToResolution(aliReq.Parameters.Size)
-		if err != nil {
-			return nil, err
-		}
-		resolution = toResolution
-	} else {
-		resolution = strings.ToUpper(aliReq.Parameters.Resolution)
-		if !strings.HasSuffix(resolution, "P") {
-			resolution = resolution + "P"
-		}
+		return sizeToResolution(aliReq.Parameters.Size)
 	}
-	if otherRatio, ok := aliRatios[aliReq.Model]; ok {
-		if ratio, ok := otherRatio[resolution]; ok {
-			otherRatios[fmt.Sprintf("resolution-%s", resolution)] = ratio
-		}
+	return normalizeAliResolution(aliReq.Parameters.Resolution), nil
+}
+
+func ProcessAliOtherRatios(aliReq *AliVideoRequest) (map[string]float64, error) {
+	resolution, err := aliResolutionFromRequest(aliReq)
+	if err != nil {
+		return nil, err
 	}
-	return otherRatios, nil
+	if aliReq.Parameters == nil {
+		return map[string]float64{}, nil
+	}
+	return aliOtherRatiosForRequest(aliReq.Model, resolution, aliReq.Parameters.Mode, aliReq.Parameters.Audio), nil
 }
 
 func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relaycommon.TaskSubmitReq) (*AliVideoRequest, error) {
@@ -363,6 +407,66 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 		otherRatios[k] = v
 	}
 	return otherRatios
+}
+
+func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, _ *relaycommon.TaskInfo) int {
+	var aliResp AliVideoResponse
+	if err := common.Unmarshal(task.Data, &aliResp); err != nil {
+		return 0
+	}
+	if aliResp.Usage == nil {
+		return 0
+	}
+
+	duration := aliResp.Usage.Duration
+	if duration <= 0 {
+		if aliResp.Usage.OutputVideoDuration > 0 {
+			duration = aliResp.Usage.OutputVideoDuration
+		} else {
+			return 0
+		}
+	}
+
+	bc := task.PrivateData.BillingContext
+	if bc == nil {
+		return 0
+	}
+
+	modelPrice := bc.ModelPrice
+	if modelPrice <= 0 {
+		price, ok := ratio_setting.GetModelPrice(task.Properties.OriginModelName, false)
+		if !ok {
+			return 0
+		}
+		modelPrice = price
+	}
+
+	otherMultiplier := 1.0
+	for key, value := range bc.OtherRatios {
+		if value <= 0 || value == 1 {
+			continue
+		}
+		if key == "seconds" || strings.HasPrefix(key, "resolution-") {
+			continue
+		}
+		otherMultiplier *= value
+	}
+
+	if resolutionRatios := aliResolutionRatios(task.Properties.OriginModelName); resolutionRatios != nil {
+		resolutionKey := normalizeAliResolution(fmt.Sprintf("%d", aliResp.Usage.SR))
+		if ratio, ok := resolutionRatios[resolutionKey]; ok {
+			otherMultiplier *= ratio
+		} else {
+			for key, value := range bc.OtherRatios {
+				if strings.HasPrefix(key, "resolution-") && value > 0 {
+					otherMultiplier *= value
+					break
+				}
+			}
+		}
+	}
+
+	return int(modelPrice * duration * otherMultiplier * common.QuotaPerUnit * bc.GroupRatio)
 }
 
 // DoRequest delegates to common helper

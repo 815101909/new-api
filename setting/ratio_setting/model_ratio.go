@@ -44,6 +44,14 @@ func ConvertLegacyPricingJSONStringToCNY(jsonStr string) (string, error) {
 	return string(jsonBytes), nil
 }
 
+func cnyPerMillionTokenRatio(price float64) float64 {
+	return price / 14.6
+}
+
+func cnyPerCallPriceRatio(price float64) float64 {
+	return price / CNYPriceMigrationRate
+}
+
 var defaultModelRatio = convertLegacyPricingMapToCNY(map[string]float64{
 	//"midjourney":                50,
 	"gpt-4-gizmo-*":  15,
@@ -228,13 +236,22 @@ var defaultModelRatio = convertLegacyPricingMapToCNY(map[string]float64{
 	"glm-4-long":                                0.001 * cnySourceRatioBase,
 	"glm-4-flash":                               0,
 	"glm-4v-plus":                               0.01 * cnySourceRatioBase,
-	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
-	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
-	"text-embedding-v4":                         0.0343, // ￥0.0005 / 1k tokens
-	"text-embedding-v3":                         0.0343, // ￥0.0005 / 1k tokens
-	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
-	"qwen3-rerank":                              0.0343, // ￥0.0005 / 1k tokens
-	"gte-rerank-v2":                             0.0548, // ￥0.0008 / 1k tokens
+	"text-embedding-v4":                         cnyPerMillionTokenRatio(0.5),
+	"text-embedding-v3":                         cnyPerMillionTokenRatio(0.5),
+	"text-embedding-v1":                         cnyPerMillionTokenRatio(0.7),
+	"qwen3-vl-embedding":                        cnyPerMillionTokenRatio(0.7),  // 当前网关按文本 token 计费
+	"qwen2.5-vl-embedding":                      cnyPerMillionTokenRatio(0.7),  // 当前网关按文本 token 计费
+	"tongyi-embedding-vision-plus":              cnyPerMillionTokenRatio(0.5),  // 当前网关按文本 token 计费
+	"tongyi-embedding-vision-plus-2026-03-06":   cnyPerMillionTokenRatio(0.5),  // 当前网关按文本 token 计费
+	"tongyi-embedding-vision-flash":             cnyPerMillionTokenRatio(0.15), // 当前网关按文本 token 计费
+	"tongyi-embedding-vision-flash-2026-03-06":  cnyPerMillionTokenRatio(0.15), // 当前网关按文本 token 计费
+	"qwen3-rerank":                              cnyPerMillionTokenRatio(0.5),
+	"qwen3-vl-rerank":                           cnyPerMillionTokenRatio(0.7), // 当前网关按文本 token 计费
+	"gte-rerank-v2":                             cnyPerMillionTokenRatio(0.8),
+	"qwq-plus":                                  cnyPerMillionTokenRatio(1.6),
+	"qwq-32b":                                   cnyPerMillionTokenRatio(2),
+	"qwen3-235b-a22b-thinking-2507":             cnyPerMillionTokenRatio(2),
+	"qwen3-235b-a22b-instruct-2507":             cnyPerMillionTokenRatio(2),
 	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
@@ -333,6 +350,46 @@ var defaultModelPrice = convertLegacyPricingMapToCNY(map[string]float64{
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
 	"veo-3.1-fast-generate-preview":  0.15,
+	"wan2.7-image-pro":               cnyPerCallPriceRatio(0.5),
+	"wan2.7-image":                   cnyPerCallPriceRatio(0.2),
+	"qwen-image-2.0-pro":             cnyPerCallPriceRatio(0.5),
+	"qwen-image-2.0":                 cnyPerCallPriceRatio(0.2),
+	"qwen-image-max":                 cnyPerCallPriceRatio(0.5),
+	"qwen-image-plus":                cnyPerCallPriceRatio(0.2),
+	"qwen-image":                     cnyPerCallPriceRatio(0.25),
+	"qwen-image-edit-max":            cnyPerCallPriceRatio(0.5),
+	"qwen-image-edit-plus":           cnyPerCallPriceRatio(0.2),
+	"qwen-image-edit":                cnyPerCallPriceRatio(0.3),
+	"z-image-turbo":                  cnyPerCallPriceRatio(0.1),
+	"wan2.7-t2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.7-t2v-2026-04-25":          cnyPerCallPriceRatio(0.6),
+	"wan2.7-i2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.7-i2v-2026-04-25":          cnyPerCallPriceRatio(0.6),
+	"wan2.7-r2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.7-videoedit":               cnyPerCallPriceRatio(0.6),
+	"wan2.6-t2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.6-i2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.6-r2v":                     cnyPerCallPriceRatio(0.6),
+	"wan2.6-i2v-flash":               cnyPerCallPriceRatio(0.15),
+	"wan2.6-r2v-flash":               cnyPerCallPriceRatio(0.15),
+	"wan2.5-t2v-preview":             cnyPerCallPriceRatio(0.3),
+	"wan2.5-i2v-preview":             cnyPerCallPriceRatio(0.3),
+	"wan2.2-t2v-plus":                cnyPerCallPriceRatio(0.14),
+	"wan2.2-i2v-plus":                cnyPerCallPriceRatio(0.14),
+	"wan2.2-i2v-flash":               cnyPerCallPriceRatio(0.1),
+	"wan2.2-kf2v-flash":              cnyPerCallPriceRatio(0.1),
+	"wan2.2-animate-move":            cnyPerCallPriceRatio(0.4),
+	"wan2.2-animate-mix":             cnyPerCallPriceRatio(0.6),
+	"wanx2.1-t2v-plus":               cnyPerCallPriceRatio(0.7),
+	"wanx2.1-t2v-turbo":              cnyPerCallPriceRatio(0.24),
+	"wanx2.1-i2v-plus":               cnyPerCallPriceRatio(0.7),
+	"wanx2.1-i2v-turbo":              cnyPerCallPriceRatio(0.24),
+	"wanx2.1-kf2v-plus":              cnyPerCallPriceRatio(0.7),
+	"wanx2.1-vace-plus":              cnyPerCallPriceRatio(0.7),
+	"happyhorse-1.0-t2v":             cnyPerCallPriceRatio(0.9),
+	"happyhorse-1.0-i2v":             cnyPerCallPriceRatio(0.9),
+	"happyhorse-1.0-r2v":             cnyPerCallPriceRatio(0.9),
+	"happyhorse-1.0-video-edit":      cnyPerCallPriceRatio(0.9),
 })
 
 var defaultAudioRatio = map[string]float64{
@@ -358,10 +415,14 @@ var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
 var defaultCompletionRatio = map[string]float64{
-	"gpt-4-gizmo-*":  2,
-	"gpt-4o-gizmo-*": 3,
-	"gpt-4-all":      2,
-	"gpt-image-1":    8,
+	"gpt-4-gizmo-*":                 2,
+	"gpt-4o-gizmo-*":                3,
+	"gpt-4-all":                     2,
+	"gpt-image-1":                   8,
+	"qwq-plus":                      2.5,
+	"qwq-32b":                       3,
+	"qwen3-235b-a22b-thinking-2507": 10,
+	"qwen3-235b-a22b-instruct-2507": 4,
 }
 
 // InitRatioSettings initializes all model related settings maps
@@ -455,6 +516,10 @@ func GetDefaultModelRatioMap() map[string]float64 {
 
 func GetDefaultModelPriceMap() map[string]float64 {
 	return defaultModelPrice
+}
+
+func GetDefaultCompletionRatioMap() map[string]float64 {
+	return defaultCompletionRatio
 }
 
 func CompletionRatio2JSONString() string {

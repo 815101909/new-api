@@ -162,3 +162,11 @@ func GetCacheRatioCopy() map[string]float64 {
 func GetCreateCacheRatioCopy() map[string]float64 {
 	return createCacheRatioMap.ReadAll()
 }
+
+func GetDefaultCacheRatioMap() map[string]float64 {
+	return defaultCacheRatio
+}
+
+func GetDefaultCreateCacheRatioMap() map[string]float64 {
+	return defaultCreateCacheRatio
+}

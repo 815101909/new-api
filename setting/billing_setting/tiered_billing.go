@@ -23,8 +23,8 @@ type BillingSetting struct {
 }
 
 var billingSetting = BillingSetting{
-	BillingMode: make(map[string]string),
-	BillingExpr: make(map[string]string),
+	BillingMode: defaultBillingModeMap(),
+	BillingExpr: defaultBillingExprMap(),
 }
 
 func init() {

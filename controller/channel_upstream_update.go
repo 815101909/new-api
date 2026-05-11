@@ -14,8 +14,10 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	relayali "github.com/QuantumNous/new-api/relay/channel/ali"
 	"github.com/QuantumNous/new-api/relay/channel/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/ollama"
+	taskali "github.com/QuantumNous/new-api/relay/channel/task/ali"
 	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
@@ -259,6 +261,16 @@ func getUpstreamModelUpdateMinCheckIntervalSeconds() int64 {
 	return interval
 }
 
+func mergeAliKnownModelNames(models []string) []string {
+	// DashScope's /compatible-mode/v1/models does not currently enumerate every
+	// officially supported Ali model family we already route, especially task
+	// video models and some image / embedding variants. Merge the upstream
+	// response with our curated Ali allowlist so the admin UI does not
+	// misclassify official models as "removed".
+	merged := mergeModelNames(models, relayali.ModelList)
+	return mergeModelNames(merged, taskali.ModelList)
+}
+
 func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 	baseURL := constant.ChannelBaseURLs[channel.Type]
 	if channel.GetBaseURL() != "" {
@@ -343,7 +355,11 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 		return item.ID
 	})
 
-	return normalizeModelNames(ids), nil
+	normalizedIDs := normalizeModelNames(ids)
+	if channel.Type == constant.ChannelTypeAli {
+		return mergeAliKnownModelNames(normalizedIDs), nil
+	}
+	return normalizedIDs, nil
 }
 
 func updateChannelUpstreamModelSettings(channel *model.Channel, settings dto.ChannelOtherSettings, updateModels bool) error {
