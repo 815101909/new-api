@@ -502,6 +502,14 @@ type Stat struct {
 	Tokens int `json:"tokens"`
 }
 
+type TokenUsageOverviewLog struct {
+	CreatedAt        int64  `json:"created_at"`
+	ModelName        string `json:"model_name"`
+	Quota            int    `json:"quota"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+}
+
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
@@ -601,6 +609,25 @@ func SumUsedQuotaByTokenId(tokenId int, startTimestamp int64, endTimestamp int64
 	}
 
 	return stat, nil
+}
+
+func ListTokenUsageOverviewLogsByTokenId(tokenId int, startTimestamp int64, endTimestamp int64) (logs []TokenUsageOverviewLog, err error) {
+	tx := LOG_DB.Model(&Log{}).
+		Select("created_at, model_name, quota, prompt_tokens, completion_tokens").
+		Where("token_id = ?", tokenId).
+		Where("type = ?", LogTypeConsume)
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+	err = tx.Order("created_at asc").Find(&logs).Error
+	if err != nil {
+		common.SysError("failed to query token overview logs: " + err.Error())
+		return nil, errors.New("查询统计数据失败")
+	}
+	return logs, nil
 }
 
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {

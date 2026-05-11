@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -49,6 +51,34 @@ type factoryUsageTopupTokenRequest struct {
 	Remark          string  `json:"remark"`
 }
 
+type factoryUsageOverviewDailyItem struct {
+	Date      string  `json:"date"`
+	Label     string  `json:"label"`
+	Quota     int     `json:"quota"`
+	Tokens    int     `json:"tokens"`
+	AmountCny float64 `json:"amount_cny"`
+}
+
+type factoryUsageOverviewModelShareItem struct {
+	ModelName string  `json:"model_name"`
+	Quota     int     `json:"quota"`
+	Tokens    int     `json:"tokens"`
+	AmountCny float64 `json:"amount_cny"`
+}
+
+type factoryUsageOverviewPayload struct {
+	TodayQuota         int                                  `json:"today_quota"`
+	TodayTokens        int                                  `json:"today_tokens"`
+	TodayAmountCny     float64                              `json:"today_amount_cny"`
+	YesterdayQuota     int                                  `json:"yesterday_quota"`
+	YesterdayTokens    int                                  `json:"yesterday_tokens"`
+	YesterdayAmountCny float64                              `json:"yesterday_amount_cny"`
+	Rpm                int                                  `json:"rpm"`
+	Tpm                int                                  `json:"tpm"`
+	Daily              []factoryUsageOverviewDailyItem      `json:"daily"`
+	ModelShare         []factoryUsageOverviewModelShareItem `json:"model_share"`
+}
+
 const defaultFactoryUsageSyncSecret = "dev-new-api-sync-secret"
 
 func getFactoryUsageSyncSecret() string {
@@ -59,6 +89,123 @@ func getFactoryUsageSyncSecret() string {
 		return secret
 	}
 	return defaultFactoryUsageSyncSecret
+}
+
+func newFactoryUsageOverviewPayload(now time.Time) *factoryUsageOverviewPayload {
+	overview := &factoryUsageOverviewPayload{
+		Daily:      make([]factoryUsageOverviewDailyItem, 0, 7),
+		ModelShare: make([]factoryUsageOverviewModelShareItem, 0),
+	}
+	location := now.Location()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	startDay := startOfToday.AddDate(0, 0, -6)
+	for i := 0; i < 7; i++ {
+		day := startDay.AddDate(0, 0, i)
+		overview.Daily = append(overview.Daily, factoryUsageOverviewDailyItem{
+			Date:      day.Format("2006-01-02"),
+			Label:     day.Format("01-02"),
+			Quota:     0,
+			Tokens:    0,
+			AmountCny: 0,
+		})
+	}
+	return overview
+}
+
+func buildFactoryUsageOverview(tokenId int) (*factoryUsageOverviewPayload, error) {
+	now := time.Now()
+	overview := newFactoryUsageOverviewPayload(now)
+	if tokenId <= 0 {
+		return overview, nil
+	}
+
+	location := now.Location()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	startTimestamp := startOfToday.AddDate(0, 0, -6).Unix()
+	endTimestamp := now.Unix()
+
+	logs, err := model.ListTokenUsageOverviewLogsByTokenId(tokenId, startTimestamp, endTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := model.SumUsedQuotaByTokenId(tokenId, startTimestamp, endTimestamp, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	overview.Rpm = stat.Rpm
+	overview.Tpm = stat.Tpm
+
+	dailyMap := make(map[string]*factoryUsageOverviewDailyItem, len(overview.Daily))
+	for index := range overview.Daily {
+		item := &overview.Daily[index]
+		dailyMap[item.Date] = item
+	}
+
+	modelMap := make(map[string]*factoryUsageOverviewModelShareItem)
+	for _, log := range logs {
+		quota := log.Quota
+		tokens := log.PromptTokens + log.CompletionTokens
+		amountCny := 0.0
+		if common.QuotaPerUnit > 0 {
+			amountCny = float64(quota) / common.QuotaPerUnit
+		}
+
+		dayKey := time.Unix(log.CreatedAt, 0).In(location).Format("2006-01-02")
+		if item, ok := dailyMap[dayKey]; ok {
+			item.Quota += quota
+			item.Tokens += tokens
+			item.AmountCny += amountCny
+		}
+
+		modelName := strings.TrimSpace(log.ModelName)
+		if modelName == "" {
+			modelName = "未知模型"
+		}
+		if _, ok := modelMap[modelName]; !ok {
+			modelMap[modelName] = &factoryUsageOverviewModelShareItem{
+				ModelName: modelName,
+				Quota:     0,
+				Tokens:    0,
+				AmountCny: 0,
+			}
+		}
+		modelMap[modelName].Quota += quota
+		modelMap[modelName].Tokens += tokens
+		modelMap[modelName].AmountCny += amountCny
+	}
+
+	if len(overview.Daily) > 0 {
+		lastIndex := len(overview.Daily) - 1
+		overview.TodayQuota = overview.Daily[lastIndex].Quota
+		overview.TodayTokens = overview.Daily[lastIndex].Tokens
+		overview.TodayAmountCny = overview.Daily[lastIndex].AmountCny
+	}
+	if len(overview.Daily) > 1 {
+		yesterdayIndex := len(overview.Daily) - 2
+		overview.YesterdayQuota = overview.Daily[yesterdayIndex].Quota
+		overview.YesterdayTokens = overview.Daily[yesterdayIndex].Tokens
+		overview.YesterdayAmountCny = overview.Daily[yesterdayIndex].AmountCny
+	}
+
+	modelShare := make([]factoryUsageOverviewModelShareItem, 0, len(modelMap))
+	for _, item := range modelMap {
+		if item.Tokens <= 0 {
+			continue
+		}
+		modelShare = append(modelShare, *item)
+	}
+	sort.Slice(modelShare, func(i int, j int) bool {
+		if modelShare[i].Tokens == modelShare[j].Tokens {
+			return modelShare[i].ModelName < modelShare[j].ModelName
+		}
+		return modelShare[i].Tokens > modelShare[j].Tokens
+	})
+	if len(modelShare) > 5 {
+		modelShare = modelShare[:5]
+	}
+	overview.ModelShare = modelShare
+
+	return overview, nil
 }
 
 func assertFactoryUsageSecret(c *gin.Context) bool {
@@ -351,14 +498,14 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		content = fmt.Sprintf("%s，备注：%s", content, remark)
 	}
 	audit := map[string]interface{}{
-		"source":            "aigc_factory",
-		"factory_user_id":   factoryUserId,
-		"factory_username":  factoryUsername,
-		"new_api_user_id":   token.UserId,
-		"new_api_username":  newApiUsername,
-		"amount_cny":        req.AmountCny,
-		"quota":             quota,
-		"quota_per_unit":    common.QuotaPerUnit,
+		"source":           "aigc_factory",
+		"factory_user_id":  factoryUserId,
+		"factory_username": factoryUsername,
+		"new_api_user_id":  token.UserId,
+		"new_api_username": newApiUsername,
+		"amount_cny":       req.AmountCny,
+		"quota":            quota,
+		"quota_per_unit":   common.QuotaPerUnit,
 	}
 	log := &model.Log{
 		UserId:    token.UserId,
@@ -391,11 +538,11 @@ func TopupFactoryUsageToken(c *gin.Context) {
 		UnlimitedQuota:  token.UnlimitedQuota,
 	}
 	common.ApiSuccess(c, gin.H{
-		"bound":             true,
-		"binding":           payload,
-		"quota":             quota,
-		"amount_cny":        req.AmountCny,
-		"quota_per_unit":    common.QuotaPerUnit,
+		"bound":          true,
+		"binding":        payload,
+		"quota":          quota,
+		"amount_cny":     req.AmountCny,
+		"quota_per_unit": common.QuotaPerUnit,
 	})
 }
 
@@ -413,10 +560,10 @@ func GetFactoryUsageLogs(c *gin.Context) {
 		pageInfo.SetTotal(0)
 		pageInfo.SetItems([]*model.Log{})
 		common.ApiSuccess(c, gin.H{
-			"bound":             false,
-			"binding":           nil,
-			"quota_per_unit":    common.QuotaPerUnit,
-			"page":              pageInfo,
+			"bound":          false,
+			"binding":        nil,
+			"quota_per_unit": common.QuotaPerUnit,
+			"page":           pageInfo,
 		})
 		return
 	}
@@ -448,10 +595,10 @@ func GetFactoryUsageLogs(c *gin.Context) {
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(logs)
 	common.ApiSuccess(c, gin.H{
-		"bound":             true,
-		"binding":           target.Binding,
-		"quota_per_unit":    common.QuotaPerUnit,
-		"page":              pageInfo,
+		"bound":          true,
+		"binding":        target.Binding,
+		"quota_per_unit": common.QuotaPerUnit,
+		"page":           pageInfo,
 	})
 }
 
@@ -465,16 +612,21 @@ func GetFactoryUsageStat(c *gin.Context) {
 		return
 	}
 	if target == nil || !target.Bound {
-		common.ApiSuccess(c, gin.H{
-			"bound":             false,
-			"binding":           nil,
-			"quota":             0,
-			"rpm":               0,
-			"tpm":               0,
-			"tokens":            0,
-			"amount_cny":        0,
-			"quota_per_unit":    common.QuotaPerUnit,
-		})
+		response := gin.H{
+			"bound":          false,
+			"binding":        nil,
+			"quota":          0,
+			"rpm":            0,
+			"tpm":            0,
+			"tokens":         0,
+			"amount_cny":     0,
+			"quota_per_unit": common.QuotaPerUnit,
+		}
+		includeOverview := strings.TrimSpace(c.Query("include_overview"))
+		if includeOverview == "1" || strings.EqualFold(includeOverview, "true") {
+			response["overview"] = newFactoryUsageOverviewPayload(time.Now())
+		}
+		common.ApiSuccess(c, response)
 		return
 	}
 
@@ -489,14 +641,24 @@ func GetFactoryUsageStat(c *gin.Context) {
 		return
 	}
 	amountCny := float64(stat.Quota) / common.QuotaPerUnit
-	common.ApiSuccess(c, gin.H{
-		"bound":             true,
-		"binding":           target.Binding,
-		"quota":             stat.Quota,
-		"rpm":               stat.Rpm,
-		"tpm":               stat.Tpm,
-		"tokens":            stat.Tokens,
-		"amount_cny":        amountCny,
-		"quota_per_unit":    common.QuotaPerUnit,
-	})
+	response := gin.H{
+		"bound":          true,
+		"binding":        target.Binding,
+		"quota":          stat.Quota,
+		"rpm":            stat.Rpm,
+		"tpm":            stat.Tpm,
+		"tokens":         stat.Tokens,
+		"amount_cny":     amountCny,
+		"quota_per_unit": common.QuotaPerUnit,
+	}
+	includeOverview := strings.TrimSpace(c.Query("include_overview"))
+	if includeOverview == "1" || strings.EqualFold(includeOverview, "true") {
+		overview, overviewErr := buildFactoryUsageOverview(target.TokenId)
+		if overviewErr != nil {
+			common.ApiError(c, overviewErr)
+			return
+		}
+		response["overview"] = overview
+	}
+	common.ApiSuccess(c, response)
 }
