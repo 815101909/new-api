@@ -124,6 +124,8 @@ func getDomesticDefaultCatalog() ([]upstreamVendor, []upstreamModel) {
 		domesticModel("doubao-seedance-1-0-lite-t2v-250428", "火山方舟", "Seedance 1.0 Lite T2V，适合低成本文生视频。", "Doubao.Color", "国产,视频,文生视频", []string{"openai-video"}),
 		domesticModel("doubao-seedance-1-0-lite-i2v-250428", "火山方舟", "Seedance 1.0 Lite I2V，适合低成本图生视频。", "Doubao.Color", "国产,视频,图生视频", []string{"openai-video"}),
 		domesticModel("doubao-seedance-1-5-pro-251215", "火山方舟", "Seedance 1.5 Pro 视频生成模型，支持有声视频生成。", "Doubao.Color", "国产,视频,有声视频", []string{"openai-video"}),
+		domesticModel("doubao-seedance-2-0-260128", "火山方舟", "Seedance 2.0 视频生成模型，适合高质量、多镜头叙事和原声音画同步场景。", "Doubao.Color", "国产,视频,有声视频", []string{"openai-video"}),
+		domesticModel("doubao-seedance-2-0-fast-260128", "火山方舟", "Seedance 2.0 Fast 视频生成模型，适合更快的高质量有声视频生成。", "Doubao.Color", "国产,视频,有声视频", []string{"openai-video"}),
 
 		domesticModel("ernie-4.0-turbo-8k", "百度千帆", "ERNIE 4.0 Turbo，适合通用中文创作和问答。", "Wenxin.Color", "国产,文本", []string{"openai"}),
 		domesticModel("ernie-4.0-turbo-128k", "百度千帆", "ERNIE 4.0 Turbo 128K，适合长文本处理。", "Wenxin.Color", "国产,文本,长上下文", []string{"openai"}),

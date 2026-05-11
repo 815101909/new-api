@@ -18,6 +18,8 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/ollama"
 	taskali "github.com/QuantumNous/new-api/relay/channel/task/ali"
+	taskdoubao "github.com/QuantumNous/new-api/relay/channel/task/doubao"
+	relayvolcengine "github.com/QuantumNous/new-api/relay/channel/volcengine"
 	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
@@ -271,6 +273,14 @@ func mergeAliKnownModelNames(models []string) []string {
 	return mergeModelNames(merged, taskali.ModelList)
 }
 
+func mergeVolcEngineKnownModelNames(models []string) []string {
+	// Ark's /v1/models list may omit some official image / video task models
+	// that this project already supports. Merge with our curated allowlists to
+	// keep channel sync and admin UI aligned with the official VolcEngine set.
+	merged := mergeModelNames(models, relayvolcengine.ModelList)
+	return mergeModelNames(merged, taskdoubao.ModelList)
+}
+
 func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 	baseURL := constant.ChannelBaseURLs[channel.Type]
 	if channel.GetBaseURL() != "" {
@@ -358,6 +368,9 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 	normalizedIDs := normalizeModelNames(ids)
 	if channel.Type == constant.ChannelTypeAli {
 		return mergeAliKnownModelNames(normalizedIDs), nil
+	}
+	if channel.Type == constant.ChannelTypeVolcEngine {
+		return mergeVolcEngineKnownModelNames(normalizedIDs), nil
 	}
 	return normalizedIDs, nil
 }
