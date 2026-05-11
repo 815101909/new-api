@@ -196,6 +196,30 @@ func buildFetchModelsHeaders(channel *model.Channel, key string) (http.Header, e
 	return headers, nil
 }
 
+func buildFetchModelsURL(channelType int, baseURL string) string {
+	switch channelType {
+	case constant.ChannelTypeAli:
+		return fmt.Sprintf("%s/compatible-mode/v1/models", baseURL)
+	case constant.ChannelTypeZhipu_v4:
+		if plan, ok := constant.ChannelSpecialBases[baseURL]; ok && plan.OpenAIBaseURL != "" {
+			return fmt.Sprintf("%s/models", plan.OpenAIBaseURL)
+		}
+		return fmt.Sprintf("%s/api/paas/v4/models", baseURL)
+	case constant.ChannelTypeVolcEngine:
+		if plan, ok := constant.ChannelSpecialBases[baseURL]; ok && plan.OpenAIBaseURL != "" {
+			return fmt.Sprintf("%s/models", plan.OpenAIBaseURL)
+		}
+		return fmt.Sprintf("%s/api/v3/models", baseURL)
+	case constant.ChannelTypeMoonshot:
+		if plan, ok := constant.ChannelSpecialBases[baseURL]; ok && plan.OpenAIBaseURL != "" {
+			return fmt.Sprintf("%s/models", plan.OpenAIBaseURL)
+		}
+		return fmt.Sprintf("%s/v1/models", baseURL)
+	default:
+		return fmt.Sprintf("%s/v1/models", baseURL)
+	}
+}
+
 func FetchUpstreamModels(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -1031,7 +1055,7 @@ func FetchModels(c *gin.Context) {
 	}
 
 	client := &http.Client{}
-	url := fmt.Sprintf("%s/v1/models", baseURL)
+	url := buildFetchModelsURL(req.Type, baseURL)
 
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
