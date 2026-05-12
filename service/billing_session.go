@@ -344,6 +344,22 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
 
+	if relayInfo.IsVideoSubmitRelay() {
+		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		relayInfo.UserQuota = userQuota
+		// 视频任务改为后结算模式：提交时不预扣，完成后按实际额度扣减。
+		// 为了支持“余额大于 0 即可发起”以及最终允许扣成负数，这里统一走钱包结算。
+		session := &BillingSession{
+			relayInfo: relayInfo,
+			funding:   &WalletFunding{userId: relayInfo.UserId},
+		}
+		session.syncRelayInfo()
+		return session, nil
+	}
+
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
 
 	// 钱包路径需要先检查用户额度

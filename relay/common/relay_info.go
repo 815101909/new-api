@@ -673,6 +673,10 @@ type TaskRelayInfo struct {
 	LockedChannel any
 }
 
+func (info *RelayInfo) IsVideoSubmitRelay() bool {
+	return info != nil && info.RelayMode == relayconstant.RelayModeVideoSubmit
+}
+
 type TaskSubmitReq struct {
 	Prompt         string                 `json:"prompt"`
 	Model          string                 `json:"model,omitempty"`

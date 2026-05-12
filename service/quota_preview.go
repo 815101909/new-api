@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultTokenOverdraftLimitCNY = 1.0
+	defaultTokenOverdraftLimitCNY = 5.0
 )
 
 type ChargeQuotaFailureKind string
@@ -94,6 +94,22 @@ func BuildChargeQuotaPreview(relayInfo *relaycommon.RelayInfo, userQuota, tokenQ
 		TokenUnlimited:           tokenUnlimited,
 		MinAllowedRemainingQuota: getMinAllowedRemainingQuota(relayInfo),
 		BillingMode:              "prepaid",
+	}
+	if relayInfo != nil && relayInfo.IsVideoSubmitRelay() {
+		// 视频任务只校验当前绑定令牌是否仍有正余额，实际额度在任务完成后再结算。
+		preview.BillingMode = "video_post_consume"
+		preview.UserQuotaAfterCharge = userQuota - needQuota
+		if tokenUnlimited {
+			preview.TokenQuotaAfterCharge = tokenQuota
+			preview.Allowed = true
+			return preview
+		}
+		preview.TokenQuotaAfterCharge = tokenQuota - needQuota
+		preview.Allowed = tokenQuota > 0
+		if !preview.Allowed {
+			preview.CurrentFailureKind = ChargeQuotaFailureToken
+		}
+		return preview
 	}
 	if IsTokenOverdraftAllowed(relayInfo) {
 		preview.BillingMode = "token_overdraft"

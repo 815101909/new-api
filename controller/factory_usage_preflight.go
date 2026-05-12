@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 
@@ -21,6 +22,7 @@ type factoryUsagePreflightChargeRequest struct {
 	ResourceType string `json:"resource_type"`
 	Model        string `json:"model"`
 	Size         string `json:"size"`
+	Resolution   string `json:"resolution"`
 	Quality      string `json:"quality"`
 	N            int    `json:"n"`
 	Duration     int    `json:"duration"`
@@ -71,6 +73,7 @@ func pickFactoryUsagePricingGroup(groups []string, channelID int, modelName stri
 func buildFactoryUsageRelayInfo(token *model.Token, modelName, group string) *relaycommon.RelayInfo {
 	return &relaycommon.RelayInfo{
 		OriginModelName: modelName,
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{},
 		TokenId:         token.Id,
 		TokenKey:        token.Key,
 		TokenUnlimited:  token.UnlimitedQuota,
@@ -135,6 +138,11 @@ func estimateFactoryUsageVideoQuota(c *gin.Context, relayInfo *relaycommon.Relay
 		Size:     strings.TrimSpace(req.Size),
 		Duration: req.Duration,
 		Seconds:  strings.TrimSpace(req.Seconds),
+	}
+	if resolution := strings.TrimSpace(req.Resolution); resolution != "" {
+		taskReq.Metadata = map[string]interface{}{
+			"resolution": resolution,
+		}
 	}
 	c.Set("task_request", taskReq)
 
@@ -249,6 +257,9 @@ func PreflightFactoryUsageCharge(c *gin.Context) {
 
 	applyFactoryUsageRelayContext(c, token, group, modelName, channel)
 	relayInfo := buildFactoryUsageRelayInfo(token, modelName, group)
+	if resourceType == "video" {
+		relayInfo.RelayMode = relayconstant.RelayModeVideoSubmit
+	}
 
 	userQuota, err := model.GetUserQuota(token.UserId, false)
 	if err != nil {

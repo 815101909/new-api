@@ -2,6 +2,7 @@ package ali
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,25 +37,33 @@ type AliVideoRequest struct {
 
 // AliVideoInput 视频输入参数
 type AliVideoInput struct {
-	Prompt         string `json:"prompt,omitempty"`          // 文本提示词
-	ImgURL         string `json:"img_url,omitempty"`         // 首帧图像URL或Base64（图生视频）
-	ImageURL       string `json:"image_url,omitempty"`       // 角色替换/角色动画输入图片
-	VideoURL       string `json:"video_url,omitempty"`       // 参考生视频/视频编辑输入视频
-	FirstFrameURL  string `json:"first_frame_url,omitempty"` // 首帧图片URL（首尾帧生视频）
-	LastFrameURL   string `json:"last_frame_url,omitempty"`  // 尾帧图片URL（首尾帧生视频）
-	AudioURL       string `json:"audio_url,omitempty"`       // 音频URL（wan2.5支持）
-	NegativePrompt string `json:"negative_prompt,omitempty"` // 反向提示词
-	Template       string `json:"template,omitempty"`        // 视频特效模板
+	Prompt         string         `json:"prompt,omitempty"`          // 文本提示词
+	ImgURL         string         `json:"img_url,omitempty"`         // 首帧图像URL或Base64（图生视频）
+	ImageURL       string         `json:"image_url,omitempty"`       // 角色替换/角色动画输入图片
+	VideoURL       string         `json:"video_url,omitempty"`       // 参考生视频/视频编辑输入视频
+	ReferenceVoice string         `json:"reference_voice,omitempty"` // 参考音色URL（wan2.7）
+	Media          []AliMediaItem `json:"media,omitempty"`           // 2.7 / HappyHorse 媒体输入
+	FirstFrameURL  string         `json:"first_frame_url,omitempty"` // 首帧图片URL（首尾帧生视频）
+	LastFrameURL   string         `json:"last_frame_url,omitempty"`  // 尾帧图片URL（首尾帧生视频）
+	AudioURL       string         `json:"audio_url,omitempty"`       // 音频URL（wan2.5支持）
+	NegativePrompt string         `json:"negative_prompt,omitempty"` // 反向提示词
+	Template       string         `json:"template,omitempty"`        // 视频特效模板
+}
+
+type AliMediaItem struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
 }
 
 // AliVideoParameters 视频参数
 type AliVideoParameters struct {
 	Resolution   string `json:"resolution,omitempty"`    // 分辨率: 480P/720P/1080P（图生视频、首尾帧生视频）
 	Size         string `json:"size,omitempty"`          // 尺寸: 如 "832*480"（文生视频）
+	Ratio        string `json:"ratio,omitempty"`         // 宽高比: 16:9/9:16/1:1/4:3/3:4（wan2.7/HappyHorse）
 	Mode         string `json:"mode,omitempty"`          // 模式: wan-std/wan-pro（角色动画）
 	Duration     int    `json:"duration,omitempty"`      // 时长: 3-10秒
 	PromptExtend bool   `json:"prompt_extend,omitempty"` // 是否开启prompt智能改写
-	Watermark    bool   `json:"watermark,omitempty"`     // 是否添加水印
+	Watermark    bool   `json:"watermark"`               // 是否添加水印
 	Audio        *bool  `json:"audio,omitempty"`         // 是否添加音频（wan2.5）
 	Seed         int    `json:"seed,omitempty"`          // 随机数种子
 }
@@ -148,6 +157,9 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	taskReq, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
 		return nil, errors.Wrap(err, "get_task_request_failed")
+	}
+	if err := populateAliMultipartImage(c, &taskReq); err != nil {
+		return nil, errors.Wrap(err, "populate_multipart_image_failed")
 	}
 
 	aliReq, err := a.convertToAliRequest(info, taskReq)
@@ -250,6 +262,213 @@ func normalizeAliMode(mode string) string {
 	return mode
 }
 
+func normalizeAliRatio(size string) string {
+	normalized := strings.TrimSpace(strings.ToLower(size))
+	if normalized == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer("*", "x", ":", "x", "：", "x", " ", "")
+	normalized = replacer.Replace(normalized)
+	switch normalized {
+	case "16x9":
+		return "16:9"
+	case "9x16":
+		return "9:16"
+	case "1x1":
+		return "1:1"
+	case "4x3":
+		return "4:3"
+	case "3x4":
+		return "3:4"
+	default:
+		return ""
+	}
+}
+
+func aliMetadataStringValue(metadata map[string]interface{}, keys ...string) string {
+	if metadata == nil {
+		return ""
+	}
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if value, ok := metadata[key]; ok {
+			text := strings.TrimSpace(fmt.Sprintf("%v", value))
+			if text != "" && text != "<nil>" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func hasAliMediaType(media []AliMediaItem, mediaType string) bool {
+	normalizedType := strings.TrimSpace(mediaType)
+	if normalizedType == "" {
+		return false
+	}
+	for _, item := range media {
+		if strings.EqualFold(strings.TrimSpace(item.Type), normalizedType) {
+			return true
+		}
+	}
+	return false
+}
+
+func appendAliMediaItem(media []AliMediaItem, mediaType, url string) []AliMediaItem {
+	normalizedType := strings.TrimSpace(mediaType)
+	normalizedURL := strings.TrimSpace(url)
+	if normalizedType == "" || normalizedURL == "" || hasAliMediaType(media, normalizedType) {
+		return media
+	}
+	return append(media, AliMediaItem{
+		Type: normalizedType,
+		URL:  normalizedURL,
+	})
+}
+
+func usesAliModernMediaInput(model string) bool {
+	return strings.HasPrefix(model, "wan2.7") || strings.HasPrefix(model, "happyhorse-1.0")
+}
+
+func isAliImageToVideoModel(model string) bool {
+	return strings.Contains(model, "i2v")
+}
+
+func isAliReferenceToVideoModel(model string) bool {
+	return strings.Contains(model, "r2v")
+}
+
+func isAliVideoEditModel(model string) bool {
+	return strings.Contains(model, "videoedit") || strings.Contains(model, "video-edit")
+}
+
+func isAliTextToVideoModel(model string) bool {
+	return strings.Contains(model, "t2v")
+}
+
+func firstAliImageInput(req relaycommon.TaskSubmitReq) string {
+	if strings.TrimSpace(req.InputReference) != "" {
+		return strings.TrimSpace(req.InputReference)
+	}
+	if strings.TrimSpace(req.Image) != "" {
+		return strings.TrimSpace(req.Image)
+	}
+	for _, image := range req.Images {
+		if strings.TrimSpace(image) != "" {
+			return strings.TrimSpace(image)
+		}
+	}
+	return ""
+}
+
+func legacyAliSizeFromRatio(model, ratio string) string {
+	switch ratio {
+	case "16:9":
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			return "1920*1080"
+		}
+		return "1280*720"
+	case "9:16":
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			return "1080*1920"
+		}
+		return "720*1280"
+	case "1:1":
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			return "1440*1440"
+		}
+		return "960*960"
+	case "4:3":
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			return "1632*1248"
+		}
+		return "1088*832"
+	case "3:4":
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			return "1248*1632"
+		}
+		return "832*1088"
+	default:
+		return ""
+	}
+}
+
+func applyAliDefaultOutputSpec(model string, params *AliVideoParameters) {
+	if params == nil {
+		return
+	}
+	if params.Size != "" || params.Resolution != "" {
+		return
+	}
+	if isAliTextToVideoModel(model) {
+		if usesAliModernMediaInput(model) {
+			params.Resolution = "1080P"
+			return
+		}
+		if strings.HasPrefix(model, "wan2.5") || strings.HasPrefix(model, "wan2.2") {
+			params.Size = "1920*1080"
+		} else {
+			params.Size = "1280*720"
+		}
+		return
+	}
+	switch {
+	case strings.HasPrefix(model, "wan2.7"):
+		params.Resolution = "1080P"
+	case strings.HasPrefix(model, "happyhorse-1.0"):
+		params.Resolution = "1080P"
+	case strings.HasPrefix(model, "wan2.6"):
+		params.Resolution = "1080P"
+	case strings.HasPrefix(model, "wan2.5"):
+		params.Resolution = "1080P"
+	case strings.HasPrefix(model, "wan2.2-i2v-flash"):
+		params.Resolution = "720P"
+	case strings.HasPrefix(model, "wan2.2-i2v-plus"):
+		params.Resolution = "1080P"
+	default:
+		params.Resolution = "720P"
+	}
+}
+
+func populateAliMultipartImage(c *gin.Context, req *relaycommon.TaskSubmitReq) error {
+	if req == nil {
+		return nil
+	}
+	if strings.TrimSpace(firstAliImageInput(*req)) != "" {
+		return nil
+	}
+	mf, err := c.MultipartForm()
+	if err != nil {
+		return nil
+	}
+	files, exists := mf.File["input_reference"]
+	if !exists || len(files) == 0 {
+		return nil
+	}
+	fileHeader := files[0]
+	file, err := fileHeader.Open()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+	mimeType := fileHeader.Header.Get("Content-Type")
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		mimeType = http.DetectContentType(fileBytes)
+	}
+	req.InputReference = fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(fileBytes))
+	if strings.TrimSpace(req.Image) == "" {
+		req.Image = req.InputReference
+	}
+	return nil
+}
+
 func aliOtherRatiosForRequest(modelName, resolution, mode string, audio *bool) map[string]float64 {
 	otherRatios := make(map[string]float64)
 	if resolutionRatios := aliResolutionRatios(modelName); resolutionRatios != nil {
@@ -294,29 +513,42 @@ func ProcessAliOtherRatios(aliReq *AliVideoRequest) (map[string]float64, error) 
 
 func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relaycommon.TaskSubmitReq) (*AliVideoRequest, error) {
 	upstreamModel := req.Model
-	if info.IsModelMapped {
+	if info != nil && info.ChannelMeta != nil && info.IsModelMapped {
 		upstreamModel = info.UpstreamModelName
 	}
+	imageInput := firstAliImageInput(req)
+	ratioInput := normalizeAliRatio(req.Size)
 	aliReq := &AliVideoRequest{
 		Model: upstreamModel,
 		Input: AliVideoInput{
 			Prompt: req.Prompt,
-			ImgURL: req.InputReference,
+			ImgURL: imageInput,
 		},
 		Parameters: &AliVideoParameters{
 			PromptExtend: true, // 默认开启智能改写
 			Watermark:    false,
 		},
 	}
+	if aliReq.Parameters == nil {
+		aliReq.Parameters = &AliVideoParameters{}
+	}
 
 	// 处理分辨率映射
 	if req.Size != "" {
 		// text to video size must be contained *
 		if strings.Contains(req.Model, "t2v") && !strings.Contains(req.Size, "*") {
-			return nil, fmt.Errorf("invalid size: %s, example: %s", req.Size, "1920*1080")
+			if ratioInput == "" {
+				return nil, fmt.Errorf("invalid size: %s, example: %s", req.Size, "1920*1080")
+			}
 		}
 		if strings.Contains(req.Size, "*") {
 			aliReq.Parameters.Size = req.Size
+		} else if ratioInput != "" {
+			if usesAliModernMediaInput(upstreamModel) {
+				aliReq.Parameters.Ratio = ratioInput
+			} else if isAliTextToVideoModel(upstreamModel) {
+				aliReq.Parameters.Size = legacyAliSizeFromRatio(upstreamModel, ratioInput)
+			}
 		} else {
 			resolution := strings.ToUpper(req.Size)
 			// 支持 480p, 720p, 1080p 或 480P, 720P, 1080P
@@ -324,29 +556,6 @@ func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relay
 				resolution = resolution + "P"
 			}
 			aliReq.Parameters.Resolution = resolution
-		}
-	} else {
-		// 根据模型设置默认分辨率
-		if strings.Contains(req.Model, "t2v") { // image to video
-			if strings.HasPrefix(req.Model, "wan2.5") {
-				aliReq.Parameters.Size = "1920*1080"
-			} else if strings.HasPrefix(req.Model, "wan2.2") {
-				aliReq.Parameters.Size = "1920*1080"
-			} else {
-				aliReq.Parameters.Size = "1280*720"
-			}
-		} else {
-			if strings.HasPrefix(req.Model, "wan2.6") {
-				aliReq.Parameters.Resolution = "1080P"
-			} else if strings.HasPrefix(req.Model, "wan2.5") {
-				aliReq.Parameters.Resolution = "1080P"
-			} else if strings.HasPrefix(req.Model, "wan2.2-i2v-flash") {
-				aliReq.Parameters.Resolution = "720P"
-			} else if strings.HasPrefix(req.Model, "wan2.2-i2v-plus") {
-				aliReq.Parameters.Resolution = "1080P"
-			} else {
-				aliReq.Parameters.Resolution = "720P"
-			}
 		}
 	}
 
@@ -378,6 +587,79 @@ func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relay
 
 	if aliReq.Model != upstreamModel {
 		return nil, errors.New("can't change model with metadata")
+	}
+	if aliReq.Parameters == nil {
+		aliReq.Parameters = &AliVideoParameters{}
+	}
+	aliReq.Parameters.Watermark = false
+	if aliReq.Parameters.Resolution == "" {
+		aliReq.Parameters.Resolution = normalizeAliResolution(
+			aliMetadataStringValue(req.Metadata, "resolution", "output_resolution", "outputResolution"),
+		)
+	} else {
+		aliReq.Parameters.Resolution = normalizeAliResolution(aliReq.Parameters.Resolution)
+	}
+	if normalizedRatio := normalizeAliRatio(aliReq.Parameters.Ratio); normalizedRatio != "" {
+		aliReq.Parameters.Ratio = normalizedRatio
+	}
+
+	applyAliDefaultOutputSpec(upstreamModel, aliReq.Parameters)
+
+	if usesAliModernMediaInput(upstreamModel) {
+		referenceVideoInput := aliMetadataStringValue(req.Metadata, "reference_video", "referenceVideo")
+		referenceVoiceInput := aliMetadataStringValue(req.Metadata, "reference_voice", "referenceVoice")
+		if referenceVideoInput == "" {
+			referenceVideoInput = strings.TrimSpace(aliReq.Input.VideoURL)
+		}
+		if referenceVoiceInput == "" {
+			referenceVoiceInput = strings.TrimSpace(aliReq.Input.ReferenceVoice)
+		}
+		if referenceVoiceInput == "" && strings.HasPrefix(upstreamModel, "wan2.7") {
+			referenceVoiceInput = strings.TrimSpace(aliReq.Input.AudioURL)
+		}
+		if referenceVoiceInput == "" && strings.HasPrefix(upstreamModel, "wan2.7") {
+			referenceVoiceInput = aliMetadataStringValue(req.Metadata, "voice_url", "voiceUrl")
+		}
+		switch {
+		case isAliImageToVideoModel(upstreamModel):
+			aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "first_frame", imageInput)
+			aliReq.Input.ImgURL = ""
+			aliReq.Input.ReferenceVoice = ""
+			if aliReq.Parameters != nil {
+				aliReq.Parameters.Size = ""
+				aliReq.Parameters.Ratio = ""
+			}
+		case isAliReferenceToVideoModel(upstreamModel):
+			aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_image", imageInput)
+			if strings.HasPrefix(upstreamModel, "wan2.7") {
+				aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_video", referenceVideoInput)
+				aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_voice", referenceVoiceInput)
+			}
+			aliReq.Input.ImgURL = ""
+			aliReq.Input.VideoURL = ""
+			aliReq.Input.ReferenceVoice = ""
+			aliReq.Input.AudioURL = ""
+			if aliReq.Parameters != nil {
+				aliReq.Parameters.Size = ""
+			}
+		case isAliVideoEditModel(upstreamModel):
+			aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_image", imageInput)
+			if strings.HasPrefix(upstreamModel, "wan2.7") {
+				aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_video", referenceVideoInput)
+				aliReq.Input.Media = appendAliMediaItem(aliReq.Input.Media, "reference_voice", referenceVoiceInput)
+			}
+			aliReq.Input.ImgURL = ""
+			aliReq.Input.VideoURL = ""
+			aliReq.Input.ReferenceVoice = ""
+			aliReq.Input.AudioURL = ""
+			if aliReq.Parameters != nil {
+				aliReq.Parameters.Size = ""
+			}
+		case isAliTextToVideoModel(upstreamModel):
+			if aliReq.Parameters != nil {
+				aliReq.Parameters.Size = ""
+			}
+		}
 	}
 
 	return aliReq, nil
