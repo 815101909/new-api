@@ -352,6 +352,12 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
+		if userQuota < 0 && IsTokenOverdraftAllowed(relayInfo) {
+			return nil, types.NewErrorWithStatusCode(
+				fmt.Errorf("余额不足，请充值"),
+				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
 		if userQuota <= 0 && !IsTokenOverdraftAllowed(relayInfo) {
 			return nil, types.NewErrorWithStatusCode(
 				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),

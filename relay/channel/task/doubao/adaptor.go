@@ -138,12 +138,21 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 	if err != nil {
 		return nil
 	}
+	ratios := make(map[string]float64)
 	if hasVideoInMetadata(req.Metadata) {
 		if ratio, ok := GetVideoInputRatio(info.OriginModelName); ok {
-			return map[string]float64{"video_input": ratio}
+			ratios["video_input"] = ratio
 		}
 	}
-	return nil
+	if audioEnabledInMetadata(req.Metadata) {
+		if ratio, ok := GetAudioEnabledRatio(info.OriginModelName); ok {
+			ratios["audio_enabled"] = ratio
+		}
+	}
+	if len(ratios) == 0 {
+		return nil
+	}
+	return ratios
 }
 
 // hasVideoInMetadata 直接检查 metadata 的 content 数组是否包含 video_url 条目，
@@ -173,6 +182,28 @@ func hasVideoInMetadata(metadata map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+func audioEnabledInMetadata(metadata map[string]interface{}) bool {
+	if metadata == nil {
+		return false
+	}
+	raw, ok := metadata["generate_audio"]
+	if !ok {
+		return true
+	}
+	switch value := raw.(type) {
+	case bool:
+		return value
+	case string:
+		return value != "false"
+	case dto.BoolValue:
+		return bool(value)
+	case *dto.BoolValue:
+		return value != nil && bool(*value)
+	default:
+		return true
+	}
 }
 
 // BuildRequestBody converts request into Doubao specific format.

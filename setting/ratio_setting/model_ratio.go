@@ -266,6 +266,18 @@ var defaultModelRatio = convertLegacyPricingMapToCNY(map[string]float64{
 	"embedding_s1_v1":                           0.0715, // ¥0.001 / 1k tokens
 	"semantic_similarity_s1_v1":                 0.0715, // ¥0.001 / 1k tokens
 	"hunyuan":                                   7.143,  // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
+	"Doubao-pro-32k":                            cnyPerMillionTokenRatio(0.8),
+	"Doubao-lite-32k":                           cnyPerMillionTokenRatio(0.3),
+	"doubao-seedance-1-0-pro-250528":            cnyPerMillionTokenRatio(15),
+	"doubao-seedance-1-0-pro-fast-250610":       cnyPerMillionTokenRatio(4.2),
+	"doubao-seedance-1-0-pro-fast-251015":       cnyPerMillionTokenRatio(4.2),
+	"doubao-seedance-1-0-lite-t2v":              cnyPerMillionTokenRatio(10),
+	"doubao-seedance-1-0-lite-t2v-250428":       cnyPerMillionTokenRatio(10),
+	"doubao-seedance-1-0-lite-i2v":              cnyPerMillionTokenRatio(10),
+	"doubao-seedance-1-0-lite-i2v-250428":       cnyPerMillionTokenRatio(10),
+	"doubao-seedance-1-5-pro-251215":            cnyPerMillionTokenRatio(8),
+	"doubao-seedance-2-0-260128":                cnyPerMillionTokenRatio(46),
+	"doubao-seedance-2-0-fast-260128":           cnyPerMillionTokenRatio(37),
 	// https://platform.lingyiwanwu.com/docs#-计费单元
 	// 旧版值会统一迁移到人民币底层倍率
 	"yi-34b-chat-0205":       0.18,
@@ -350,6 +362,10 @@ var defaultModelPrice = convertLegacyPricingMapToCNY(map[string]float64{
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
 	"veo-3.1-fast-generate-preview":  0.15,
+	"doubao-seedream-4-0-250828":     cnyPerCallPriceRatio(0.2),
+	"seedream-4-0-250828":            cnyPerCallPriceRatio(0.2),
+	"doubao-seedream-4-5-251128":     cnyPerCallPriceRatio(0.25),
+	"seedream-4-5-251128":            cnyPerCallPriceRatio(0.25),
 	"wan2.7-image-pro":               cnyPerCallPriceRatio(0.5),
 	"wan2.7-image":                   cnyPerCallPriceRatio(0.2),
 	"qwen-image-2.0-pro":             cnyPerCallPriceRatio(0.5),
@@ -419,6 +435,8 @@ var defaultCompletionRatio = map[string]float64{
 	"gpt-4o-gizmo-*":                3,
 	"gpt-4-all":                     2,
 	"gpt-image-1":                   8,
+	"Doubao-pro-32k":                2.5,
+	"Doubao-lite-32k":               2,
 	"qwq-plus":                      2.5,
 	"qwq-32b":                       3,
 	"qwen3-235b-a22b-thinking-2507": 10,
@@ -445,8 +463,28 @@ func ModelPrice2JSONString() string {
 	return modelPriceMap.MarshalJSONString()
 }
 
+func loadMergedPricingMap(m *types.RWMap[string, float64], jsonStr string, defaults map[string]float64) error {
+	merged := make(map[string]float64, len(defaults))
+	for key, value := range defaults {
+		merged[key] = value
+	}
+	if strings.TrimSpace(jsonStr) != "" {
+		loaded := make(map[string]float64)
+		if err := common.UnmarshalJsonStr(jsonStr, &loaded); err != nil {
+			return err
+		}
+		for key, value := range loaded {
+			merged[key] = value
+		}
+	}
+	m.Clear()
+	m.AddAll(merged)
+	InvalidateExposedDataCache()
+	return nil
+}
+
 func UpdateModelPriceByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
+	return loadMergedPricingMap(modelPriceMap, jsonStr, defaultModelPrice)
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
@@ -475,7 +513,7 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache)
+	return loadMergedPricingMap(modelRatioMap, jsonStr, defaultModelRatio)
 }
 
 // 处理带有思考预算的模型名称，方便统一定价
@@ -527,7 +565,7 @@ func CompletionRatio2JSONString() string {
 }
 
 func UpdateCompletionRatioByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(completionRatioMap, jsonStr, InvalidateExposedDataCache)
+	return loadMergedPricingMap(completionRatioMap, jsonStr, defaultCompletionRatio)
 }
 
 func GetCompletionRatio(name string) float64 {

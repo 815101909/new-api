@@ -170,7 +170,7 @@ func priceDataToBillingMode(usePrice bool) string {
 func buildFactoryUsagePreflightPayload(preview service.ChargeQuotaPreview) factoryUsagePreflightChargePayload {
 	payload := factoryUsagePreflightChargePayload{
 		Allowed:                preview.Allowed,
-		StrictPrecheck:         preview.BillingMode == "prepaid",
+		StrictPrecheck:         preview.BillingMode == "prepaid" || !preview.Allowed,
 		BillingMode:            preview.BillingMode,
 		NeedQuota:              preview.NeedQuota,
 		RemainQuota:            preview.TokenQuota,
@@ -182,11 +182,7 @@ func buildFactoryUsagePreflightPayload(preview service.ChargeQuotaPreview) facto
 		QuotaPerUnit:           common.QuotaPerUnit,
 	}
 	if !preview.Allowed {
-		if preview.BillingMode == "prepaid" {
-			payload.Message = "余额不足，请充值"
-		} else {
-			payload.Message = "透支额度不足，请充值"
-		}
+		payload.Message = "余额不足，请充值"
 	}
 	return payload
 }

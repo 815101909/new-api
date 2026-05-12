@@ -1,4 +1,5 @@
 import { useState, useMemo, memo, useCallback, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -17,7 +18,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useMediaQuery } from '@/hooks'
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -36,7 +37,11 @@ import {
   DataTableToolbar,
   DataTablePagination,
 } from '@/components/data-table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/status-badge'
+import { getModels, getVendors } from '@/features/models/api'
+import { modelsQueryKeys, vendorsQueryKeys } from '@/features/models/lib'
+import type { Model as CatalogModel, Vendor } from '@/features/models/types'
 import {
   combineBillingExpr,
   splitBillingExprAndRequestRules,
@@ -64,6 +69,10 @@ type ModelRatioVisualEditorProps = {
 
 type ModelRow = {
   name: string
+  vendorIds: string[]
+  vendorNames: string[]
+  vendorDisplay: string
+  hasPricing: boolean
   price?: string
   ratio?: string
   cacheRatio?: string
@@ -81,6 +90,18 @@ type ModelRow = {
 const STORAGE_KEY = 'model-ratio-column-visibility'
 const PRICE_DISPLAY_DECIMALS = 5
 const PRICE_INTERNAL_DECIMALS = 12
+const UNKNOWN_VENDOR_VALUE = '__unknown_vendor__'
+const MODEL_METADATA_PAGE_SIZE = 1000
+const MODEL_METADATA_MAX_PAGES = 50
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  vendors: false,
+  pricingStatus: false,
+  cacheRatio: false,
+  createCacheRatio: false,
+  imageRatio: false,
+  audioRatio: false,
+  audioCompletionRatio: false,
+}
 
 const hasValue = (value?: string) => value !== undefined && value !== ''
 
@@ -96,6 +117,28 @@ const formatPrice = (value: number) => {
 
 const formatInternalPrice = (value: number) => {
   return Number.parseFloat(value.toFixed(PRICE_INTERNAL_DECIMALS)).toString()
+}
+
+async function fetchAllModelMetadata(): Promise<CatalogModel[]> {
+  const items: CatalogModel[] = []
+  let page = 1
+  let total = Number.POSITIVE_INFINITY
+
+  while (page <= MODEL_METADATA_MAX_PAGES && items.length < total) {
+    const response = await getModels({
+      p: page,
+      page_size: MODEL_METADATA_PAGE_SIZE,
+    })
+    const batch = response.data?.items || []
+    total = response.data?.total || batch.length
+    items.push(...batch)
+    if (batch.length < MODEL_METADATA_PAGE_SIZE) {
+      break
+    }
+    page += 1
+  }
+
+  return items
 }
 
 const getPriceCurrencySymbol = () => '¥'
@@ -200,6 +243,32 @@ const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
   return details.length > 0 ? details.join(' · ') : t('Base input price only')
 }
 
+const hasConfiguredPricing = (row: Pick<
+  ModelRow,
+  | 'price'
+  | 'ratio'
+  | 'cacheRatio'
+  | 'createCacheRatio'
+  | 'completionRatio'
+  | 'imageRatio'
+  | 'audioRatio'
+  | 'audioCompletionRatio'
+  | 'billingMode'
+  | 'billingExpr'
+>) => {
+  if (row.billingMode === 'tiered_expr' && hasValue(row.billingExpr)) return true
+  return [
+    row.price,
+    row.ratio,
+    row.cacheRatio,
+    row.createCacheRatio,
+    row.completionRatio,
+    row.imageRatio,
+    row.audioRatio,
+    row.audioCompletionRatio,
+  ].some(hasValue)
+}
+
 export const ModelRatioVisualEditor = memo(
   function ModelRatioVisualEditor({
     modelPrice,
@@ -232,39 +301,71 @@ export const ModelRatioVisualEditor = memo(
         const saved = localStorage.getItem(STORAGE_KEY)
         if (saved) {
           try {
-            return safeJsonParse<VisibilityState>(saved, {
-              fallback: {
-                cacheRatio: false,
-                createCacheRatio: false,
-                imageRatio: false,
-                audioRatio: false,
-                audioCompletionRatio: false,
-              },
-              silent: true,
-            })
-          } catch {
             return {
-              cacheRatio: false,
-              createCacheRatio: false,
-              imageRatio: false,
-              audioRatio: false,
-              audioCompletionRatio: false,
+              ...DEFAULT_COLUMN_VISIBILITY,
+              ...safeJsonParse<VisibilityState>(saved, {
+                fallback: DEFAULT_COLUMN_VISIBILITY,
+                silent: true,
+              }),
             }
+          } catch {
+            return DEFAULT_COLUMN_VISIBILITY
           }
         }
-        return {
-          cacheRatio: false,
-          createCacheRatio: false,
-          imageRatio: false,
-          audioRatio: false,
-          audioCompletionRatio: false,
-        }
+        return DEFAULT_COLUMN_VISIBILITY
       }
     )
+
+    const { data: vendors = [] } = useQuery({
+      queryKey: vendorsQueryKeys.list({ page_size: 1000 }),
+      queryFn: async () =>
+        (await getVendors({ page_size: 1000 })).data?.items || [],
+      staleTime: 5 * 60 * 1000,
+    })
+
+    const { data: modelMetadata = [] } = useQuery({
+      queryKey: [...modelsQueryKeys.lists(), 'pricing-vendor-filter'],
+      queryFn: fetchAllModelMetadata,
+      staleTime: 5 * 60 * 1000,
+    })
 
     useEffect(() => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
     }, [columnVisibility])
+
+    const vendorNameById = useMemo(() => {
+      const map = new Map<string, string>()
+      vendors.forEach((vendor: Vendor) => {
+        map.set(String(vendor.id), vendor.name)
+      })
+      return map
+    }, [vendors])
+
+    const vendorMetaByModelName = useMemo(() => {
+      const map = new Map<
+        string,
+        {
+          ids: Set<string>
+          names: Set<string>
+        }
+      >()
+
+      modelMetadata.forEach((model: CatalogModel) => {
+        if (!model.model_name || !model.vendor_id) return
+        const vendorId = String(model.vendor_id)
+        const vendorName = vendorNameById.get(vendorId)
+        if (!vendorName) return
+        const existing = map.get(model.model_name) || {
+          ids: new Set<string>(),
+          names: new Set<string>(),
+        }
+        existing.ids.add(vendorId)
+        existing.names.add(vendorName)
+        map.set(model.model_name, existing)
+      })
+
+      return map
+    }, [modelMetadata, vendorNameById])
 
     const models = useMemo(() => {
       const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
@@ -325,9 +426,15 @@ export const ModelRatioVisualEditor = memo(
         ...Object.keys(audioCompletionMap),
         ...Object.keys(billingModeMap),
         ...Object.keys(billingExprMap),
+        ...modelMetadata
+          .map((model: CatalogModel) => model.model_name)
+          .filter(Boolean),
       ])
 
       const modelData: ModelRow[] = Array.from(modelNames).map((name) => {
+        const vendorMeta = vendorMetaByModelName.get(name)
+        const vendorIds = vendorMeta ? Array.from(vendorMeta.ids) : []
+        const vendorNames = vendorMeta ? Array.from(vendorMeta.names) : []
         const price = priceMap[name]?.toString() || ''
         const ratio = ratioMap[name]?.toString() || ''
         const cache = cacheMap[name]?.toString() || ''
@@ -347,6 +454,22 @@ export const ModelRatioVisualEditor = memo(
             splitBillingExprAndRequestRules(fullExpr)
           return {
             name,
+            vendorIds,
+            vendorNames,
+            vendorDisplay:
+              vendorNames.length > 0 ? vendorNames.join(', ') : t('Unknown'),
+            hasPricing: hasConfiguredPricing({
+              price,
+              ratio,
+              cacheRatio: cache,
+              createCacheRatio: createCache,
+              completionRatio: completion,
+              imageRatio: image,
+              audioRatio: audio,
+              audioCompletionRatio: audioCompletion,
+              billingMode: 'tiered_expr',
+              billingExpr: pureExpr,
+            }),
             billingMode: 'tiered_expr',
             billingExpr: pureExpr,
             requestRuleExpr,
@@ -364,6 +487,22 @@ export const ModelRatioVisualEditor = memo(
 
         return {
           name,
+          vendorIds,
+          vendorNames,
+          vendorDisplay:
+            vendorNames.length > 0 ? vendorNames.join(', ') : t('Unknown'),
+          hasPricing: hasConfiguredPricing({
+            price,
+            ratio,
+            cacheRatio: cache,
+            createCacheRatio: createCache,
+            completionRatio: completion,
+            imageRatio: image,
+            audioRatio: audio,
+            audioCompletionRatio: audioCompletion,
+            billingMode: price !== '' ? 'per-request' : 'per-token',
+            billingExpr: '',
+          }),
           price,
           ratio,
           cacheRatio: cache,
@@ -397,7 +536,65 @@ export const ModelRatioVisualEditor = memo(
       audioCompletionRatio,
       billingMode,
       billingExpr,
+      modelMetadata,
+      vendorMetaByModelName,
+      t,
     ])
+
+    const vendorFilterOptions = useMemo(() => {
+      const counts = new Map<string, number>()
+      let unknownCount = 0
+
+      models.forEach((model) => {
+        if (model.vendorIds.length === 0) {
+          unknownCount += 1
+          return
+        }
+        model.vendorIds.forEach((vendorId) => {
+          counts.set(vendorId, (counts.get(vendorId) || 0) + 1)
+        })
+      })
+
+      const options = vendors
+        .filter((vendor: Vendor) => counts.has(String(vendor.id)))
+        .map((vendor: Vendor) => ({
+          label: vendor.name,
+          value: String(vendor.id),
+          count: counts.get(String(vendor.id)),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+
+      if (unknownCount > 0) {
+        options.push({
+          label: t('Unknown'),
+          value: UNKNOWN_VENDOR_VALUE,
+          count: unknownCount,
+        })
+      }
+
+      return options
+    }, [models, t, vendors])
+
+    const unpricedModels = useMemo(
+      () => models.filter((model) => !model.hasPricing),
+      [models]
+    )
+
+    const pricingStatusOptions = useMemo(
+      () => [
+        {
+          label: t('Configured'),
+          value: 'configured',
+          count: models.length - unpricedModels.length,
+        },
+        {
+          label: t('Unpriced'),
+          value: 'unpriced',
+          count: unpricedModels.length,
+        },
+      ],
+      [models.length, t, unpricedModels.length]
+    )
 
     const modeCounts = useMemo(
       () =>
@@ -419,6 +616,18 @@ export const ModelRatioVisualEditor = memo(
         ),
       [models]
     )
+
+    const showOnlyUnpriced = useCallback(() => {
+      setColumnFilters((previous) => {
+        const next = previous.filter((filter) => filter.id !== 'pricingStatus')
+        next.push({ id: 'pricingStatus', value: ['unpriced'] })
+        return next
+      })
+      setPagination((previous) => ({
+        ...previous,
+        pageIndex: 0,
+      }))
+    }, [])
 
     const handleEdit = useCallback(
       (model: ModelRow) => {
@@ -606,6 +815,13 @@ export const ModelRatioVisualEditor = memo(
                   copyable={false}
                 />
               )}
+              {!row.original.hasPricing && (
+                <StatusBadge
+                  label={t('Unpriced')}
+                  variant='warning'
+                  copyable={false}
+                />
+              )}
               {row.original.hasConflict && (
                 <StatusBadge
                   label={t('Conflict')}
@@ -616,6 +832,46 @@ export const ModelRatioVisualEditor = memo(
             </div>
           ),
           enableHiding: false,
+        },
+        {
+          id: 'vendors',
+          accessorFn: (row) => row.vendorDisplay,
+          header: ({ column }) => (
+            <DataTableColumnHeader column={column} title={t('Vendor')} />
+          ),
+          cell: ({ row }) => (
+            <div className='text-muted-foreground max-w-[220px] truncate text-sm'>
+              {row.original.vendorDisplay}
+            </div>
+          ),
+          filterFn: (row, _id, value) => {
+            if (!Array.isArray(value) || value.length === 0) return true
+            if (row.original.vendorIds.length === 0) {
+              return value.includes(UNKNOWN_VENDOR_VALUE)
+            }
+            return row.original.vendorIds.some((vendorId) =>
+              value.includes(vendorId)
+            )
+          },
+          meta: { label: t('Vendor') },
+        },
+        {
+          id: 'pricingStatus',
+          accessorFn: (row) => (row.hasPricing ? 'configured' : 'unpriced'),
+          header: ({ column }) => (
+            <DataTableColumnHeader column={column} title={t('Pricing status')} />
+          ),
+          cell: ({ row }) => (
+            <StatusBadge
+              label={row.original.hasPricing ? t('Configured') : t('Unpriced')}
+              variant={row.original.hasPricing ? 'success' : 'warning'}
+              copyable={false}
+            />
+          ),
+          filterFn: (row, id, value) =>
+            filterBySelectedValues(row.getValue(id), value),
+          enableHiding: false,
+          meta: { label: t('Pricing status') },
         },
         {
           accessorKey: 'billingMode',
@@ -884,10 +1140,47 @@ export const ModelRatioVisualEditor = memo(
       <div className='flex flex-col gap-4'>
         <div className='grid min-h-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]'>
           <div className='flex min-w-0 flex-col gap-4'>
+            {unpricedModels.length > 0 && (
+              <Alert className='border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/40'>
+                <AlertTriangle className='h-4 w-4' />
+                <AlertTitle>{t('Unpriced models detected')}</AlertTitle>
+                <AlertDescription className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between'>
+                  <span>
+                    {t(
+                      '{{count}} configured models are missing pricing. Review them before enabling billing or production traffic.',
+                      {
+                        count: unpricedModels.length,
+                      }
+                    )}
+                  </span>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={showOnlyUnpriced}
+                    className='shrink-0'
+                  >
+                    {t('Show unpriced models')}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
             <DataTableToolbar
               table={table}
               searchPlaceholder={t('Search models...')}
               filters={[
+                {
+                  columnId: 'pricingStatus',
+                  title: t('Pricing status'),
+                  options: pricingStatusOptions,
+                  singleSelect: true,
+                },
+                {
+                  columnId: 'vendors',
+                  title: t('Vendor'),
+                  options: vendorFilterOptions,
+                  singleSelect: true,
+                },
                 {
                   columnId: 'billingMode',
                   title: t('Mode'),

@@ -35,6 +35,7 @@ type ChargeQuotaPreview struct {
 	TokenQuotaAfterCharge    int
 	TokenUnlimited           bool
 	MinAllowedRemainingQuota int
+	CurrentFailureKind       ChargeQuotaFailureKind
 }
 
 func parseTokenOverdraftLimitCNY() float64 {
@@ -72,6 +73,19 @@ func getMinAllowedRemainingQuota(relayInfo *relaycommon.RelayInfo) int {
 	return -GetTokenOverdraftQuotaLimit()
 }
 
+func getCurrentQuotaFailureKind(relayInfo *relaycommon.RelayInfo, userQuota, tokenQuota int, tokenUnlimited bool) ChargeQuotaFailureKind {
+	if !IsTokenOverdraftAllowed(relayInfo) {
+		return ChargeQuotaFailureNone
+	}
+	if userQuota < 0 {
+		return ChargeQuotaFailureUser
+	}
+	if !tokenUnlimited && tokenQuota < 0 {
+		return ChargeQuotaFailureToken
+	}
+	return ChargeQuotaFailureNone
+}
+
 func BuildChargeQuotaPreview(relayInfo *relaycommon.RelayInfo, userQuota, tokenQuota, needQuota int, tokenUnlimited bool) ChargeQuotaPreview {
 	preview := ChargeQuotaPreview{
 		NeedQuota:                needQuota,
@@ -90,6 +104,11 @@ func BuildChargeQuotaPreview(relayInfo *relaycommon.RelayInfo, userQuota, tokenQ
 	} else {
 		preview.TokenQuotaAfterCharge = tokenQuota - needQuota
 	}
+	preview.CurrentFailureKind = getCurrentQuotaFailureKind(relayInfo, userQuota, tokenQuota, tokenUnlimited)
+	if preview.CurrentFailureKind != ChargeQuotaFailureNone {
+		preview.Allowed = false
+		return preview
+	}
 	preview.Allowed = preview.UserQuotaAfterCharge >= preview.MinAllowedRemainingQuota
 	if preview.Allowed && !tokenUnlimited {
 		preview.Allowed = preview.TokenQuotaAfterCharge >= preview.MinAllowedRemainingQuota
@@ -98,6 +117,9 @@ func BuildChargeQuotaPreview(relayInfo *relaycommon.RelayInfo, userQuota, tokenQ
 }
 
 func (preview ChargeQuotaPreview) FailureKind() ChargeQuotaFailureKind {
+	if preview.CurrentFailureKind != ChargeQuotaFailureNone {
+		return preview.CurrentFailureKind
+	}
 	if preview.UserQuotaAfterCharge < preview.MinAllowedRemainingQuota {
 		return ChargeQuotaFailureUser
 	}

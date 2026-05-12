@@ -395,6 +395,9 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 	if err != nil {
 		return err
 	}
+	if token.RemainQuota < 0 && IsTokenOverdraftAllowed(relayInfo) {
+		return fmt.Errorf("余额不足，请充值")
+	}
 	minAllowedRemainingQuota := getMinAllowedRemainingQuota(relayInfo)
 	if !relayInfo.TokenUnlimited && token.RemainQuota-quota < minAllowedRemainingQuota {
 		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(token.RemainQuota), logger.FormatQuota(quota))

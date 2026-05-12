@@ -113,6 +113,9 @@ func defaultBillingModeMap() map[string]string {
 	} {
 		modeMap[model] = BillingModeTieredExpr
 	}
+	for model, mode := range defaultVolcEngineBillingModeMap() {
+		modeMap[model] = mode
+	}
 	return modeMap
 }
 
@@ -120,7 +123,7 @@ func defaultBillingExprMap() map[string]string {
 	thinkingOnByDefault := aliThinkingEnabledExpr(true)
 	thinkingOffByDefault := aliThinkingEnabledExpr(false)
 
-	return map[string]string{
+	exprMap := map[string]string{
 		"qwen3.6-max-preview": aliTieredExpr([]aliTier{
 			{Name: "0-128k", MaxLen: 128000, InputPrice: 9, OutputPrice: 54},
 			{Name: "128k-256k", InputPrice: 15, OutputPrice: 90},
@@ -188,6 +191,10 @@ func defaultBillingExprMap() map[string]string {
 			{Name: "128k-256k", InputPrice: 2.5, OutputPrice: 10},
 		}, "", aliCacheModeNone),
 	}
+	for model, expr := range defaultVolcEngineBillingExprMap() {
+		exprMap[model] = expr
+	}
+	return exprMap
 }
 
 func GetDefaultBillingModeMap() map[string]string {
