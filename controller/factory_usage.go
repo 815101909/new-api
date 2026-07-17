@@ -322,6 +322,11 @@ func GetFactoryUsageChannels(c *gin.Context) {
 		return
 	}
 
+	if err := model.RefreshEnabledChannelAbilitiesByGroups(groups); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
 	channelMap := make(map[int]*factoryUsageChannelPayload)
 	for _, group := range groups {
 		rows, err := model.GetEnabledChannelModelsByGroup(group)

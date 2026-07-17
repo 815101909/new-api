@@ -88,30 +88,25 @@ func getWAVDuration(r io.ReadSeeker) (float64, error) {
 
 	pcmSize := int64(dec.PCMSize)
 
-	// 如果读出来的 Size 是 0，尝试用文件大小反推
-	if pcmSize == 0 {
-		// 获取文件总大小
-		currentPos, _ := r.Seek(0, io.SeekCurrent) // 当前通常在 data chunk header 之后
-		endPos, _ := r.Seek(0, io.SeekEnd)
-		fileSize := endPos
-
-		// 恢复位置（虽然如果不继续读也没关系）
-		r.Seek(currentPos, io.SeekStart)
-
-		// 数据区大小 ≈ 文件总大小 - 当前指针位置(即Header大小)
-		// 注意：FwdToPCM 成功后，CurrentPos 应该刚好指向 Data 区数据的开始
-		// 或者是 Data Chunk ID + Size 之后。
-		// WAV Header 一般 44 字节。
-		if fileSize > 44 {
-			// 如果 FwdToPCM 成功，Reader 应该位于 data 块的数据起始处
-			// 所以剩余的所有字节理论上都是音频数据
-			pcmSize = fileSize - currentPos
-
-			// 简单的兜底：如果算出来还是负数或0，强制按文件大小-44计算
-			if pcmSize <= 0 {
-				pcmSize = fileSize - 44
-			}
-		}
+	// 流式 WAV 常把 RIFF/data 长度写成 0x7fffffff 一类占位值，文件落盘后不回填。
+	// 此时必须以 data 块起点到真实文件末尾的字节数为准，否则会把几十秒音频算成数小时。
+	currentPos, seekErr := r.Seek(0, io.SeekCurrent)
+	if seekErr != nil {
+		return 0, errors.Wrap(seekErr, "failed to get wav PCM start position")
+	}
+	fileSize, seekErr := r.Seek(0, io.SeekEnd)
+	if seekErr != nil {
+		return 0, errors.Wrap(seekErr, "failed to get wav file size")
+	}
+	if _, seekErr = r.Seek(currentPos, io.SeekStart); seekErr != nil {
+		return 0, errors.Wrap(seekErr, "failed to restore wav reader position")
+	}
+	availablePCMSize := fileSize - currentPos
+	if availablePCMSize <= 0 {
+		return 0, errors.New("wav file does not contain PCM data")
+	}
+	if pcmSize <= 0 || pcmSize > availablePCMSize {
+		pcmSize = availablePCMSize
 	}
 
 	numChans := int64(dec.NumChans)

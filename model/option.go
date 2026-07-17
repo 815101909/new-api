@@ -550,6 +550,9 @@ func updateOptionMap(key string, value string) (err error) {
 		common.DataExportDefaultTime = value
 	case "ModelRatio":
 		err = ratio_setting.UpdateModelRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.ModelRatio2JSONString()
+		}
 	case "GroupRatio":
 		err = ratio_setting.UpdateGroupRatioByJSONString(value)
 	case "GroupGroupRatio":
@@ -558,18 +561,39 @@ func updateOptionMap(key string, value string) (err error) {
 		err = setting.UpdateUserUsableGroupsByJSONString(value)
 	case "CompletionRatio":
 		err = ratio_setting.UpdateCompletionRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.CompletionRatio2JSONString()
+		}
 	case "ModelPrice":
 		err = ratio_setting.UpdateModelPriceByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.ModelPrice2JSONString()
+		}
 	case "CacheRatio":
 		err = ratio_setting.UpdateCacheRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.CacheRatio2JSONString()
+		}
 	case "CreateCacheRatio":
 		err = ratio_setting.UpdateCreateCacheRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.CreateCacheRatio2JSONString()
+		}
 	case "ImageRatio":
 		err = ratio_setting.UpdateImageRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.ImageRatio2JSONString()
+		}
 	case "AudioRatio":
 		err = ratio_setting.UpdateAudioRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.AudioRatio2JSONString()
+		}
 	case "AudioCompletionRatio":
 		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(value)
+		if err == nil {
+			common.OptionMap[key] = ratio_setting.AudioCompletionRatio2JSONString()
+		}
 	case "TopUpLink":
 		common.TopUpLink = value
 	//case "ChatLink":

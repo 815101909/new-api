@@ -21,7 +21,7 @@ import (
 const (
 	factoryAccountsPath      = "/api/internal/new-api/accounts"
 	factoryBindPath          = "/api/internal/new-api/token-bind"
-	defaultFactoryBaseURL    = "http://127.0.0.1:19001"
+	defaultFactoryBaseURL    = "http://127.0.0.1:19002"
 	defaultFactorySyncSecret = "dev-new-api-sync-secret"
 )
 

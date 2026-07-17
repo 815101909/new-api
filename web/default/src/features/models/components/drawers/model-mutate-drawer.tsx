@@ -58,6 +58,7 @@ import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
 import type { Model } from '../../types'
+import { LobeIconCombobox } from '../lobe-icon-combobox'
 
 // Extended schema for ratio configuration (internal form state only)
 const extendedModelFormSchema = z.object({
@@ -682,13 +683,15 @@ export function ModelMutateDrawer({
                   <FormItem>
                     <FormLabel>{t('Icon')}</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder={t('OpenAI, Anthropic, etc.')}
-                        {...field}
+                      <LobeIconCombobox
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder={t('Search or type an icon key')}
+                        emptyText={t('No icons found.')}
                       />
                     </FormControl>
                     <FormDescription className='text-xs'>
-                      {t('@lobehub/icons key')}
+                      {t('Select from @lobehub/icons or type a custom key')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

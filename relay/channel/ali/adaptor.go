@@ -105,6 +105,14 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			fullRequestURL = fmt.Sprintf("%s/api/v1/services/rerank/text-rerank/text-rerank", info.ChannelBaseUrl)
 		case constant.RelayModeResponses:
 			fullRequestURL = fmt.Sprintf("%s/api/v2/apps/protocols/compatible-mode/v1/responses", info.ChannelBaseUrl)
+		case constant.RelayModeAudioSpeech:
+			if isAliQwenTTSSpeechModel(info.UpstreamModelName) {
+				fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/multimodal-generation/generation", info.ChannelBaseUrl)
+			} else {
+				fullRequestURL = fmt.Sprintf("%s/api/v1/services/audio/tts/SpeechSynthesizer", info.ChannelBaseUrl)
+			}
+		case constant.RelayModeAudioTranscription:
+			fullRequestURL = fmt.Sprintf("%s/api/v1/services/audio/asr/transcription", info.ChannelBaseUrl)
 		case constant.RelayModeImagesGenerations:
 			if isSyncImageModel(info.OriginModelName) {
 				fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/multimodal-generation/generation", info.ChannelBaseUrl)
@@ -132,6 +140,12 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
 	req.Set("Authorization", "Bearer "+info.ApiKey)
+	if info.RelayMode == constant.RelayModeAudioSpeech || info.RelayMode == constant.RelayModeAudioTranscription {
+		req.Set("Content-Type", gin.MIMEJSON)
+	}
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		req.Set("X-DashScope-Async", "enable")
+	}
 	if info.IsStream {
 		req.Set("X-DashScope-SSE", "enable")
 	}
@@ -226,8 +240,14 @@ func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.Rela
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+	switch info.RelayMode {
+	case constant.RelayModeAudioSpeech:
+		return convertAliAudioSpeechRequest(info, request)
+	case constant.RelayModeAudioTranscription:
+		return convertAliAudioTranscriptionRequest(info, request)
+	default:
+		return nil, errors.New("unsupported audio relay mode")
+	}
 }
 
 func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.OpenAIResponsesRequest) (any, error) {
@@ -250,6 +270,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		return adaptor.DoResponse(c, resp, info)
 	default:
 		switch info.RelayMode {
+		case constant.RelayModeAudioSpeech:
+			return aliAudioSpeechHandler(c, resp, info)
+		case constant.RelayModeAudioTranscription:
+			return aliAudioTranscriptionHandler(c, resp, info)
 		case constant.RelayModeImagesGenerations:
 			err, usage = aliImageHandler(a, c, resp, info)
 		case constant.RelayModeImagesEdits:

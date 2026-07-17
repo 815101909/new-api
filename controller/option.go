@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -69,6 +70,25 @@ func buildCompletionRatioMetaValue(optionValues map[string]string) string {
 	return string(jsonBytes)
 }
 
+func marshalStringMapOption(value map[string]string, fallback string) string {
+	jsonBytes, err := common.Marshal(value)
+	if err != nil {
+		return fallback
+	}
+	return string(jsonBytes)
+}
+
+func buildOptionResponseValue(key, value string) string {
+	switch key {
+	case "billing_setting.billing_mode":
+		return marshalStringMapOption(billing_setting.GetBillingModeCopy(), value)
+	case "billing_setting.billing_expr":
+		return marshalStringMapOption(billing_setting.GetBillingExprCopy(), value)
+	default:
+		return value
+	}
+}
+
 func GetOptions(c *gin.Context) {
 	var options []*model.Option
 	optionValues := make(map[string]string)
@@ -83,6 +103,7 @@ func GetOptions(c *gin.Context) {
 		if isSensitiveKey && !isVisiblePublicKeyOption(k) {
 			continue
 		}
+		value = buildOptionResponseValue(k, value)
 		options = append(options, &model.Option{
 			Key:   k,
 			Value: value,

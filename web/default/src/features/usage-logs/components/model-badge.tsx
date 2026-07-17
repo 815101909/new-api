@@ -25,6 +25,9 @@ function resolveModelProvider(modelName: string): ModelProvider | null {
   const hasAny = (keywords: string[]) =>
     keywords.some((keyword) => model.includes(keyword))
 
+  if (hasAny(['qwen', 'qwq-'])) {
+    return { icon: 'Qwen.Color', label: 'Qwen' }
+  }
   if (
     hasAny([
       'gpt-',
@@ -50,9 +53,6 @@ function resolveModelProvider(modelName: string): ModelProvider | null {
   }
   if (hasAny(['deepseek-'])) {
     return { icon: 'DeepSeek.Color', label: 'DeepSeek' }
-  }
-  if (hasAny(['qwen', 'qwq-'])) {
-    return { icon: 'Qwen.Color', label: 'Qwen' }
   }
   if (hasAny(['doubao-', 'volcengine'])) {
     return { icon: 'Doubao.Color', label: 'Doubao' }

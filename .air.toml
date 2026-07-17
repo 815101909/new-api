@@ -1,0 +1,47 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = ".tmp/air"
+
+[build]
+args_bin = []
+bin = ".tmp/air/new-api.exe"
+cmd = "go build -o ./.tmp/air/new-api.exe ."
+delay = 1000
+exclude_dir = [".git",".github",".tmp",".gocache",".gomodcache",".gopath","build","data","logs","upload","web/default/node_modules","web/classic/node_modules","web/default/dist","web/classic/dist","electron/node_modules","electron/dist"]
+exclude_file = []
+exclude_regex = ["_test.go"]
+exclude_unchanged = true
+follow_symlink = false
+full_bin = ""
+include_dir = []
+include_ext = ["go","mod","sum","toml"]
+include_file = [".env"]
+kill_delay = "500ms"
+log = "build-errors.log"
+poll = false
+poll_interval = 0
+post_cmd = []
+pre_cmd = []
+rerun = false
+rerun_delay = 500
+send_interrupt = true
+stop_on_error = true
+
+[color]
+app = ""
+build = "yellow"
+main = "magenta"
+runner = "green"
+watcher = "cyan"
+
+[log]
+main_only = false
+silent = false
+time = true
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true

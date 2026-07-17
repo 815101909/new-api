@@ -2,7 +2,7 @@ FRONTEND_DIR = ./web/default
 FRONTEND_CLASSIC_DIR = ./web/classic
 BACKEND_DIR = .
 
-.PHONY: all build-frontend build-frontend-classic build-all-frontends start-backend dev dev-api dev-web dev-web-classic
+.PHONY: all build-frontend build-frontend-classic build-all-frontends start-backend dev dev-api dev-backend-hot dev-web dev-web-classic
 
 all: build-all-frontends start-backend
 
@@ -19,6 +19,10 @@ build-all-frontends: build-frontend build-frontend-classic
 start-backend:
 	@echo "Starting backend dev server..."
 	@cd $(BACKEND_DIR) && go run main.go &
+
+dev-backend-hot:
+	@echo "Starting backend hot reload server..."
+	@cd $(BACKEND_DIR) && go run github.com/air-verse/air@latest -c .air.toml
 
 dev-api:
 	@echo "Starting backend services (docker)..."

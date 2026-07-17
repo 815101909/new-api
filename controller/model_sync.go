@@ -324,7 +324,8 @@ func ensureVendorID(vendorName string, vendorByName map[string]upstreamVendor, v
 
 // SyncUpstreamModels 同步上游模型与供应商：
 // - 默认仅创建「未配置模型」
-// - 可通过 overwrite 选择性覆盖更新本地已有模型的字段（前提：sync_official <> 0）
+// - 可通过 overwrite 选择性覆盖更新本地已有模型的字段
+// - 官方源覆盖需 sync_official <> 0；内置国产默认包允许手动确认后覆盖
 func SyncUpstreamModels(c *gin.Context) {
 	var req syncRequest
 	// 允许空体
@@ -437,14 +438,15 @@ func SyncUpstreamModels(c *gin.Context) {
 
 		// 创建模型
 		mi := &model.Model{
-			ModelName:   name,
-			Description: up.Description,
-			Endpoints:   string(up.Endpoints),
-			Icon:        up.Icon,
-			Tags:        up.Tags,
-			VendorID:    vendorID,
-			Status:      chooseStatus(up.Status, 1),
-			NameRule:    up.NameRule,
+			ModelName:    name,
+			Description:  up.Description,
+			Endpoints:    string(up.Endpoints),
+			Icon:         up.Icon,
+			Tags:         up.Tags,
+			VendorID:     vendorID,
+			Status:       chooseStatus(up.Status, 1),
+			SyncOfficial: 1,
+			NameRule:     up.NameRule,
 		}
 		if err := mi.Insert(); err == nil {
 			createdModels++
@@ -467,8 +469,8 @@ func SyncUpstreamModels(c *gin.Context) {
 				continue
 			}
 
-			// 跳过被禁用官方同步的模型
-			if local.SyncOfficial == 0 {
+			// 官方源遵循模型的同步开关；内置国产默认包是显式手动导入，可在确认冲突后覆盖。
+			if local.SyncOfficial == 0 && !isDomesticSyncSource(req.Source) {
 				continue
 			}
 
@@ -602,7 +604,11 @@ func SyncUpstreamPreview(c *gin.Context) {
 	// 2) 本地已有模型
 	var locals []model.Model
 	if len(upstreamNames) > 0 {
-		_ = model.DB.Where("model_name IN ? AND sync_official <> 0", upstreamNames).Find(&locals).Error
+		query := model.DB.Where("model_name IN ?", upstreamNames)
+		if !isDomesticSyncSource(source) {
+			query = query.Where("sync_official <> 0")
+		}
+		_ = query.Find(&locals).Error
 	}
 
 	// 本地 vendor 名称映射

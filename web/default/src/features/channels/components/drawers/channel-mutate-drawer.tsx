@@ -84,10 +84,6 @@ import {
 import { JsonEditor } from '@/components/json-editor'
 import { MultiSelect } from '@/components/multi-select'
 import {
-  SecureVerificationDialog,
-  useSecureVerification,
-} from '@/features/auth/secure-verification'
-import {
   createChannel,
   fetchModels,
   getAllModels,
@@ -337,17 +333,6 @@ export function ChannelMutateDrawer({
   })
 
   const { copyToClipboard } = useCopyToClipboard()
-
-  const {
-    open: verificationOpen,
-    methods: verificationMethods,
-    state: verificationState,
-    executeVerification,
-    withVerification,
-    cancel: cancelVerification,
-    setCode: setVerificationCode,
-    switchMethod: switchVerificationMethod,
-  } = useSecureVerification()
 
   useEffect(() => {
     if (!open) {
@@ -696,18 +681,13 @@ export function ChannelMutateDrawer({
     if (!channelId) return
 
     try {
-      await withVerification(fetchChannelKey, {
-        preferredMethod: 'passkey',
-        title: 'Verify to view channel key',
-        description:
-          'Use Passkey or 2FA to confirm your identity before revealing this channel key.',
-      })
+      await fetchChannelKey()
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message)
       }
     }
-  }, [channelId, withVerification, fetchChannelKey])
+  }, [channelId, fetchChannelKey])
 
   const handleRefreshCodexCredential = useCallback(async () => {
     if (!channelId) return
@@ -1948,9 +1928,7 @@ export function ChannelMutateDrawer({
                                   {t('Current key')}
                                 </p>
                                 <p className='text-muted-foreground text-xs'>
-                                  {t(
-                                    'Verification required to reveal the saved key.'
-                                  )}
+                                  {t('Reveal key')}
                                 </p>
                               </div>
                               <div className='flex items-center gap-2'>
@@ -1959,13 +1937,9 @@ export function ChannelMutateDrawer({
                                   variant='outline'
                                   size='sm'
                                   onClick={handleRevealKey}
-                                  disabled={
-                                    isChannelKeyLoading ||
-                                    verificationState.loading
-                                  }
+                                  disabled={isChannelKeyLoading}
                                 >
-                                  {isChannelKeyLoading ||
-                                  verificationState.loading ? (
+                                  {isChannelKeyLoading ? (
                                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                                   ) : (
                                     <Eye className='mr-2 h-4 w-4' />
@@ -1991,7 +1965,7 @@ export function ChannelMutateDrawer({
                             <Input
                               readOnly
                               value={channelKey ?? ''}
-                              placeholder={t('Hidden — verify to reveal')}
+                              placeholder='********'
                               className='font-mono'
                             />
                           </div>
@@ -3385,23 +3359,6 @@ export function ChannelMutateDrawer({
           redirectSourceModels={redirectModelKeyList}
         />
       )}
-
-      <SecureVerificationDialog
-        open={verificationOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            cancelVerification()
-          }
-        }}
-        methods={verificationMethods}
-        state={verificationState}
-        onVerify={async (method, code) => {
-          await executeVerification(method, code)
-        }}
-        onCancel={cancelVerification}
-        onCodeChange={setVerificationCode}
-        onMethodChange={switchVerificationMethod}
-      />
 
       {/* Missing Models Confirmation Dialog */}
       <MissingModelsConfirmationDialog

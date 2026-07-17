@@ -80,6 +80,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 		if !isLegacy && task.Quota != 0 {
 			RefundTaskQuota(ctx, task, reason)
 		}
+		syncTaskUseTimeToLogs(task)
 	}
 
 	if timedOutCount > 0 {
@@ -244,6 +245,10 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 		err = task.Update()
 		if err != nil {
 			common.SysLog("UpdateSunoTask task error: " + err.Error())
+			continue
+		}
+		if task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure {
+			syncTaskUseTimeToLogs(task)
 		}
 	}
 	return nil
@@ -497,6 +502,9 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	if shouldRefund {
 		RefundTaskQuota(ctx, task, task.FailReason)
 	}
+	if isDone {
+		syncTaskUseTimeToLogs(task)
+	}
 
 	return nil
 }
@@ -541,6 +549,7 @@ func truncateBase64(s string) string {
 //  2. taskResult.TotalTokens > 0 → 按 token 重算
 //  3. 都不满足 → 保持预扣额度不变
 func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor, task *model.Task, taskResult *relaycommon.TaskInfo) {
+	defer syncTaskUseTimeToLogs(task)
 	// 0. 按次计费的任务不做差额结算
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.PerCallBilling {
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 按次计费，跳过差额结算", task.TaskID))

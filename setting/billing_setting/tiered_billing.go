@@ -22,10 +22,15 @@ type BillingSetting struct {
 	BillingExpr map[string]string `json:"billing_expr"`
 }
 
-var billingSetting = BillingSetting{
-	BillingMode: defaultBillingModeMap(),
-	BillingExpr: defaultBillingExprMap(),
-}
+var (
+	defaultBillingModes = defaultBillingModeMap()
+	defaultBillingExprs = defaultBillingExprMap()
+
+	billingSetting = BillingSetting{
+		BillingMode: copyBillingStringMap(defaultBillingModes, nil),
+		BillingExpr: copyBillingStringMap(defaultBillingExprs, nil),
+	}
+)
 
 func init() {
 	config.GlobalConfig.Register("billing_setting", &billingSetting)
@@ -35,24 +40,41 @@ func init() {
 // Read accessors (hot path, must be fast)
 // ---------------------------------------------------------------------------
 
+func copyBillingStringMap(base map[string]string, override map[string]string) map[string]string {
+	result := make(map[string]string, len(base)+len(override))
+	for key, value := range base {
+		result[key] = value
+	}
+	for key, value := range override {
+		result[key] = value
+	}
+	return result
+}
+
 func GetBillingMode(model string) string {
 	if mode, ok := billingSetting.BillingMode[model]; ok {
+		return mode
+	}
+	if mode, ok := defaultBillingModes[model]; ok {
 		return mode
 	}
 	return BillingModeRatio
 }
 
 func GetBillingExpr(model string) (string, bool) {
-	expr, ok := billingSetting.BillingExpr[model]
+	if expr, ok := billingSetting.BillingExpr[model]; ok {
+		return expr, true
+	}
+	expr, ok := defaultBillingExprs[model]
 	return expr, ok
 }
 
 func GetBillingModeCopy() map[string]string {
-	return lo.Assign(billingSetting.BillingMode)
+	return copyBillingStringMap(defaultBillingModes, billingSetting.BillingMode)
 }
 
 func GetBillingExprCopy() map[string]string {
-	return lo.Assign(billingSetting.BillingExpr)
+	return copyBillingStringMap(defaultBillingExprs, billingSetting.BillingExpr)
 }
 
 func GetPricingSyncData(base map[string]any) map[string]any {

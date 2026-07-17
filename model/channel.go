@@ -736,8 +736,17 @@ func EnableChannelByTag(tag string) error {
 	if err != nil {
 		return err
 	}
-	err = UpdateAbilityStatusByTag(tag, true)
-	return err
+	channels, err := GetChannelsByTag(tag, false, true)
+	if err != nil {
+		return err
+	}
+	for _, channel := range channels {
+		channel.Status = common.ChannelStatusEnabled
+		if err = channel.UpdateAbilities(nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func DisableChannelByTag(tag string) error {

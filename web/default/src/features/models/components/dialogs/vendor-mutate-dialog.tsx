@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createVendor, updateVendor } from '../../api'
 import { vendorsQueryKeys, modelsQueryKeys } from '../../lib'
 import { vendorFormSchema, type Vendor } from '../../types'
+import { LobeIconCombobox } from '../lobe-icon-combobox'
 
 type VendorMutateDialogProps = {
   open: boolean
@@ -162,13 +163,15 @@ export function VendorMutateDialog({
                 <FormItem>
                   <FormLabel>{t('Icon')}</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder={t('OpenAI, Anthropic, Google, etc.')}
-                      {...field}
+                    <LobeIconCombobox
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      placeholder={t('Search or type an icon key')}
+                      emptyText={t('No icons found.')}
                     />
                   </FormControl>
                   <FormDescription>
-                    {t('@lobehub/icons key name')}
+                    {t('Select from @lobehub/icons or type a custom key')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

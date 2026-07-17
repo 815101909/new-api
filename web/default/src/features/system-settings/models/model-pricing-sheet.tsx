@@ -3,6 +3,7 @@ import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, ChevronDown } from 'lucide-react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -47,9 +48,13 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
+import {
+  getDynamicRequestPricingProfileKey,
+  isDynamicRequestPricingModel,
+} from './dynamic-request-pricing'
 import { TieredPricingEditor } from './tiered-pricing-editor'
 
-const createModelPricingSchema = (t: (key: string) => string) =>
+const createModelPricingSchema = (t: TFunction) =>
   z.object({
     name: z.string().min(1, t('Model name is required')),
     price: z.string().optional(),
@@ -237,7 +242,7 @@ function displayPriceNumber(value: string): number | null {
 
 function formatDisplayPrice(
   value: string | undefined,
-  t: (key: string) => string
+  t: TFunction
 ): string {
   const displayValue = formatPriceDisplayNumber(value)
   return displayValue
@@ -302,6 +307,13 @@ function getModeLabel(mode: PricingMode) {
   return 'Per-token'
 }
 
+function getDisplayModeLabel(mode: PricingMode, modelName?: string) {
+  if (mode === 'per-request' && isDynamicRequestPricingModel(modelName)) {
+    return 'Dynamic per-request'
+  }
+  return getModeLabel(mode)
+}
+
 function getModeBadgeVariant(
   mode: PricingMode
 ): 'default' | 'secondary' | 'outline' {
@@ -318,7 +330,7 @@ function buildPreviewRows(
   promptPrice: string,
   lanePrices: Record<LaneKey, string>,
   laneEnabled: Record<LaneKey, boolean>,
-  t: (key: string) => string
+  t: TFunction
 ): PreviewRow[] {
   if (mode === 'tiered_expr') {
     const effectiveExpr = combineBillingExpr(billingExpr, requestRuleExpr)
@@ -334,6 +346,27 @@ function buildPreviewRows(
   }
 
   if (mode === 'per-request') {
+    const profileKey = getDynamicRequestPricingProfileKey(values.name)
+    if (profileKey) {
+      return [
+        {
+          key: 'price',
+          label: t('Base request price'),
+          value: formatDisplayPrice(values.price, t),
+        },
+        {
+          key: 'dynamicPricing',
+          label: t('Billing'),
+          value: t(
+            '{{profile}}; actual billing follows duration, resolution, off-peak and generation options.',
+            {
+              profile: t(profileKey),
+            }
+          ),
+          multiline: true,
+        },
+      ]
+    }
     return [
       {
         key: 'price',
@@ -764,6 +797,9 @@ export function ModelPricingEditorPanel({
   }
 
   const activeName = watchedValues.name || editData?.name || t('New model')
+  const dynamicProfileKey = getDynamicRequestPricingProfileKey(activeName)
+  const isDynamicRequestPricing =
+    pricingMode === 'per-request' && isDynamicRequestPricingModel(activeName)
 
   return (
     <div
@@ -784,7 +820,7 @@ export function ModelPricingEditorPanel({
           </div>
           <div className='flex shrink-0 items-center gap-2'>
             <Badge variant={getModeBadgeVariant(pricingMode)}>
-              {t(getModeLabel(pricingMode))}
+              {t(getDisplayModeLabel(pricingMode, activeName))}
             </Badge>
           </div>
         </div>
@@ -894,7 +930,11 @@ export function ModelPricingEditorPanel({
                     name='price'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('Fixed price')}</FormLabel>
+                        <FormLabel>
+                          {isDynamicRequestPricing
+                            ? t('Base request price')
+                            : t('Fixed price')}
+                        </FormLabel>
                         <FormControl>
                           <InputGroup>
                             <InputGroupAddon>
@@ -912,12 +952,23 @@ export function ModelPricingEditorPanel({
                               }}
                             />
                             <InputGroupAddon align='inline-end'>
-                              {t('per request')}
+                              {isDynamicRequestPricing
+                                ? t('default request')
+                                : t('per request')}
                             </InputGroupAddon>
                           </InputGroup>
                         </FormControl>
                         <FormDescription>
-                          {t('Cost in CNY per request.')}
+                          {isDynamicRequestPricing
+                            ? t(
+                                'Cost in CNY for {{profile}}. Actual Vidu billing is adjusted by duration, resolution, off-peak and generation options when the task is submitted.',
+                                {
+                                  profile: dynamicProfileKey
+                                    ? t(dynamicProfileKey)
+                                    : '',
+                                }
+                              )
+                            : t('Cost in CNY per request.')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

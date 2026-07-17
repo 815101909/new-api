@@ -3,6 +3,8 @@ package controller
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/stretchr/testify/require"
@@ -27,6 +29,85 @@ func TestMergeModelNames(t *testing.T) {
 	)
 
 	require.Equal(t, []string{"gpt-4o", "gpt-4.1", "gpt-4.1-mini"}, result)
+}
+
+func TestFetchChannelUpstreamModelIDsReturnsStaticViduModels(t *testing.T) {
+	result, err := fetchChannelUpstreamModelIDs(&model.Channel{
+		Type: constant.ChannelTypeVidu,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"viduq3-turbo",
+		"viduq3-pro",
+		"viduq3-pro-fast",
+		"viduq2-pro-fast",
+		"viduq2-pro",
+		"viduq2-turbo",
+		"viduq2",
+		"viduq1",
+		"viduq1-classic",
+		"vidu2.0",
+		"vidu1.5",
+	}, result)
+}
+
+func TestDomesticViduImageModelsExposeImageGenerationEndpoint(t *testing.T) {
+	_, models := getDomesticDefaultCatalog()
+	modelByName := make(map[string]upstreamModel, len(models))
+	for _, item := range models {
+		modelByName[item.ModelName] = item
+	}
+
+	for _, modelName := range []string{"viduq2", "viduq1"} {
+		item, ok := modelByName[modelName]
+		require.True(t, ok, "missing Vidu model %s", modelName)
+
+		var endpoints map[string]common.EndpointInfo
+		require.NoError(t, common.Unmarshal(item.Endpoints, &endpoints))
+		require.Contains(t, endpoints, string(constant.EndpointTypeOpenAIVideo))
+		require.Contains(t, endpoints, string(constant.EndpointTypeImageGeneration))
+	}
+
+	viduQ2 := modelByName["viduq2"]
+	require.Contains(t, viduQ2.Description, "默认按 4K 输出")
+	require.Contains(t, viduQ2.Tags, "4K")
+}
+
+func TestDomesticAliAudioModelsExposeAudioEndpoints(t *testing.T) {
+	_, models := getDomesticDefaultCatalog()
+	modelByName := make(map[string]upstreamModel, len(models))
+	for _, item := range models {
+		modelByName[item.ModelName] = item
+	}
+
+	cases := []struct {
+		modelName string
+		endpoint  constant.EndpointType
+		tag       string
+	}{
+		{modelName: "paraformer-v2", endpoint: constant.EndpointTypeAudioTranscriptions, tag: "语音识别"},
+		{modelName: "fun-asr", endpoint: constant.EndpointTypeAudioTranscriptions, tag: "语音识别"},
+		{modelName: "cosyvoice-v3.5-plus", endpoint: constant.EndpointTypeAudioSpeech, tag: "语音合成"},
+		{modelName: "cosyvoice-v3.5-flash", endpoint: constant.EndpointTypeAudioSpeech, tag: "语音合成"},
+		{modelName: "cosyvoice-v3-plus", endpoint: constant.EndpointTypeAudioSpeech, tag: "语音合成"},
+		{modelName: "cosyvoice-v3-flash", endpoint: constant.EndpointTypeAudioSpeech, tag: "语音合成"},
+		{modelName: "qwen3-tts-vc-2026-01-22", endpoint: constant.EndpointTypeAudioSpeech, tag: "语音合成"},
+	}
+
+	for _, tc := range cases {
+		item, ok := modelByName[tc.modelName]
+		require.True(t, ok, "missing Ali audio model %s", tc.modelName)
+		require.Equal(t, "阿里百炼", item.VendorName)
+		require.Contains(t, item.Tags, tc.tag)
+
+		var endpoints map[string]common.EndpointInfo
+		require.NoError(t, common.Unmarshal(item.Endpoints, &endpoints))
+		info, ok := endpoints[string(tc.endpoint)]
+		require.True(t, ok, "missing endpoint %s for model %s", tc.endpoint, tc.modelName)
+		require.Equal(t, httpMethodPost, info.Method)
+		require.NotEmpty(t, info.Path)
+	}
 }
 
 func TestSubtractModelNames(t *testing.T) {

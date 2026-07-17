@@ -56,6 +56,40 @@ func GetEnabledChannelModelsByGroup(group string) ([]EnabledChannelModel, error)
 	return rows, err
 }
 
+func RefreshEnabledChannelAbilitiesByGroups(groups []string) error {
+	groupSet := make(map[string]struct{}, len(groups))
+	for _, group := range groups {
+		group = strings.TrimSpace(group)
+		if group != "" {
+			groupSet[group] = struct{}{}
+		}
+	}
+	if len(groupSet) == 0 {
+		return nil
+	}
+
+	var channels []*Channel
+	if err := DB.Model(&Channel{}).Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error; err != nil {
+		return err
+	}
+	for _, channel := range channels {
+		matched := false
+		for _, group := range strings.Split(channel.Group, ",") {
+			if _, ok := groupSet[strings.TrimSpace(group)]; ok {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		if err := channel.UpdateAbilities(nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func GetGroupEnabledModels(group string) []string {
 	var models []string
 	// Find distinct models

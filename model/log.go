@@ -321,15 +321,16 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 }
 
 type RecordTaskBillingLogParams struct {
-	UserId    int
-	LogType   int
-	Content   string
-	ChannelId int
-	ModelName string
-	Quota     int
-	TokenId   int
-	Group     string
-	Other     map[string]interface{}
+	UserId         int
+	LogType        int
+	Content        string
+	ChannelId      int
+	ModelName      string
+	Quota          int
+	TokenId        int
+	UseTimeSeconds int
+	Group          string
+	Other          map[string]interface{}
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -354,6 +355,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		Quota:     params.Quota,
 		ChannelId: params.ChannelId,
 		TokenId:   params.TokenId,
+		UseTime:   params.UseTimeSeconds,
 		Group:     params.Group,
 		Other:     common.MapToJsonStr(params.Other),
 	}
@@ -361,6 +363,22 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	if err != nil {
 		common.SysLog("failed to record task billing log: " + err.Error())
 	}
+}
+
+func SyncTaskLogsUseTime(userId int, taskId string, useTimeSeconds int) error {
+	if userId <= 0 || taskId == "" || useTimeSeconds <= 0 {
+		return nil
+	}
+	taskIdPattern, err := sanitizeLikePattern(taskId)
+	if err != nil {
+		return err
+	}
+	likePattern := "%\"task_id\":\"" + taskIdPattern + "\"%"
+	return LOG_DB.Model(&Log{}).
+		Where("user_id = ?", userId).
+		Where("use_time = 0").
+		Where("other LIKE ? ESCAPE '!'", likePattern).
+		Update("use_time", useTimeSeconds).Error
 }
 
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string) (logs []*Log, total int64, err error) {

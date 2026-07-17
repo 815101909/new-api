@@ -46,6 +46,9 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	if info.PriceData.GroupRatioInfo.HasSpecialRatio {
 		other["user_group_ratio"] = info.PriceData.GroupRatioInfo.GroupSpecialRatio
 	}
+	if info.TaskRelayInfo != nil && info.PublicTaskID != "" {
+		other["task_id"] = info.PublicTaskID
+	}
 	if info.IsModelMapped {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = info.UpstreamModelName
@@ -62,6 +65,33 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
+}
+
+func taskUseTimeSeconds(task *model.Task) int {
+	if task == nil || task.FinishTime <= 0 {
+		return 0
+	}
+	startTime := task.StartTime
+	if startTime <= 0 {
+		startTime = task.SubmitTime
+	}
+	if startTime <= 0 {
+		startTime = task.CreatedAt
+	}
+	if startTime <= 0 || task.FinishTime < startTime {
+		return 0
+	}
+	return int(task.FinishTime - startTime)
+}
+
+func syncTaskUseTimeToLogs(task *model.Task) {
+	useTimeSeconds := taskUseTimeSeconds(task)
+	if useTimeSeconds <= 0 {
+		return
+	}
+	if err := model.SyncTaskLogsUseTime(task.UserId, task.TaskID, useTimeSeconds); err != nil {
+		common.SysLog("sync task log use_time error: " + err.Error())
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +182,7 @@ func taskModelName(task *model.Task) string {
 func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	quota := task.Quota
 	if quota == 0 {
+		syncTaskUseTimeToLogs(task)
 		return
 	}
 
@@ -168,17 +199,20 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
 	other["reason"] = reason
+	useTimeSeconds := taskUseTimeSeconds(task)
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
-		UserId:    task.UserId,
-		LogType:   model.LogTypeRefund,
-		Content:   "",
-		ChannelId: task.ChannelId,
-		ModelName: taskModelName(task),
-		Quota:     quota,
-		TokenId:   task.PrivateData.TokenId,
-		Group:     task.Group,
-		Other:     other,
+		UserId:         task.UserId,
+		LogType:        model.LogTypeRefund,
+		Content:        "",
+		ChannelId:      task.ChannelId,
+		ModelName:      taskModelName(task),
+		Quota:          quota,
+		TokenId:        task.PrivateData.TokenId,
+		UseTimeSeconds: useTimeSeconds,
+		Group:          task.Group,
+		Other:          other,
 	})
+	syncTaskUseTimeToLogs(task)
 }
 
 // RecalculateTaskQuota 通用的异步差额结算。
@@ -186,6 +220,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 // reason 用于日志记录（例如 "token重算" 或 "adaptor调整"）。
 func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int, reason string) {
 	if actualQuota <= 0 {
+		syncTaskUseTimeToLogs(task)
 		return
 	}
 	preConsumedQuota := task.Quota
@@ -194,6 +229,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	if quotaDelta == 0 {
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 预扣费准确（%s，%s）",
 			task.TaskID, logger.LogQuota(actualQuota), reason))
+		syncTaskUseTimeToLogs(task)
 		return
 	}
 
@@ -231,17 +267,20 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	other["task_id"] = task.TaskID
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
+	useTimeSeconds := taskUseTimeSeconds(task)
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
-		UserId:    task.UserId,
-		LogType:   logType,
-		Content:   reason,
-		ChannelId: task.ChannelId,
-		ModelName: taskModelName(task),
-		Quota:     logQuota,
-		TokenId:   task.PrivateData.TokenId,
-		Group:     task.Group,
-		Other:     other,
+		UserId:         task.UserId,
+		LogType:        logType,
+		Content:        reason,
+		ChannelId:      task.ChannelId,
+		ModelName:      taskModelName(task),
+		Quota:          logQuota,
+		TokenId:        task.PrivateData.TokenId,
+		UseTimeSeconds: useTimeSeconds,
+		Group:          task.Group,
+		Other:          other,
 	})
+	syncTaskUseTimeToLogs(task)
 }
 
 // RecalculateTaskQuotaByTokens 根据实际 token 消耗重新计费（异步差额结算）。

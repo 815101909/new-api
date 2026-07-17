@@ -20,7 +20,7 @@ func getDomesticDefaultCatalog() ([]upstreamVendor, []upstreamModel) {
 		{Name: "SiliconFlow", Description: "硅基流动 SiliconCloud，聚合 Qwen、DeepSeek、GLM、BGE 等开源模型。", Icon: "SiliconCloud.Color", Status: 1},
 		{Name: "快手可灵", Description: "快手可灵 Kling，提供文生视频、图生视频等创意生成模型。", Icon: "Kling.Color", Status: 1},
 		{Name: "即梦", Description: "火山引擎即梦，提供图像与视频生成模型。", Icon: "Jimeng.Color", Status: 1},
-		{Name: "Vidu", Description: "生数科技 Vidu，提供文生视频、图生视频、首尾帧与参考视频生成模型。", Icon: "Vidu", Status: 1},
+		{Name: "Vidu", Description: "生数科技 Vidu，提供图片生成、文生视频、图生视频、首尾帧与参考视频生成模型。", Icon: "Vidu", Status: 1},
 	}
 
 	models := []upstreamModel{
@@ -48,6 +48,13 @@ func getDomesticDefaultCatalog() ([]upstreamVendor, []upstreamModel) {
 		domesticModel("qwen3-coder-plus", "阿里百炼", "Qwen3 Coder 主力代码模型，适合仓库级理解、生成和修改。", "Qwen.Color", "国产,文本,代码", []string{"openai"}),
 		domesticModel("qwen3-coder-flash", "阿里百炼", "Qwen3 Coder 高速代码模型，适合更低延迟的代码补全与修复。", "Qwen.Color", "国产,文本,代码", []string{"openai"}),
 		domesticModel("qwen3-coder-next", "阿里百炼", "Qwen3 Coder 新一代代码模型，适合复杂编码和工程任务。", "Qwen.Color", "国产,文本,代码", []string{"openai"}),
+		domesticModel("paraformer-v2", "阿里百炼", "Paraformer 语音识别模型，适合中文、英文及多语种音频转写和字幕生成。", "Qwen.Color", "国产,音频,语音识别,ASR", []string{string(constant.EndpointTypeAudioTranscriptions)}),
+		domesticModel("fun-asr", "阿里百炼", "FunASR 语音识别兼容模型，适合长音频转写和多语种字幕识别。", "Qwen.Color", "国产,音频,语音识别,ASR", []string{string(constant.EndpointTypeAudioTranscriptions)}),
+		domesticModel("cosyvoice-v3.5-plus", "阿里百炼", "CosyVoice v3.5 Plus 语音合成模型，适合高质量多语种配音和克隆音色合成。", "Qwen.Color", "国产,音频,语音合成,TTS", []string{string(constant.EndpointTypeAudioSpeech)}),
+		domesticModel("cosyvoice-v3.5-flash", "阿里百炼", "CosyVoice v3.5 Flash 语音合成模型，适合低延迟和高并发配音生成。", "Qwen.Color", "国产,音频,语音合成,TTS", []string{string(constant.EndpointTypeAudioSpeech)}),
+		domesticModel("cosyvoice-v3-plus", "阿里百炼", "CosyVoice v3 Plus 语音合成兼容模型，适合通用中文配音和音色复刻。", "Qwen.Color", "国产,音频,语音合成,TTS", []string{string(constant.EndpointTypeAudioSpeech)}),
+		domesticModel("cosyvoice-v3-flash", "阿里百炼", "CosyVoice v3 Flash 语音合成兼容模型，适合快速生成和成本敏感配音场景。", "Qwen.Color", "国产,音频,语音合成,TTS", []string{string(constant.EndpointTypeAudioSpeech)}),
+		domesticModel("qwen3-tts-vc-2026-01-22", "阿里百炼", "千问 3 TTS-VC 语音合成模型，适合基于复刻音色的多语种配音。", "Qwen.Color", "国产,音频,语音合成,TTS,音色克隆", []string{string(constant.EndpointTypeAudioSpeech)}),
 		domesticModel("qwen-image-2.0-pro", "阿里百炼", "Qwen Image 2.0 Pro，适合文字渲染、负向提示词和多张图片变体。", "Qwen.Color", "国产,图像,编辑", []string{"image-generation"}),
 		domesticModel("qwen-image-2.0", "阿里百炼", "Qwen Image 2.0 快速图像生成 / 编辑模型。", "Qwen.Color", "国产,图像,编辑", []string{"image-generation"}),
 		domesticModel("qwen-image-max", "阿里百炼", "Qwen Image Max 文生图模型，适合兼容旧版千问出图调用。", "Qwen.Color", "国产,图像", []string{"image-generation"}),
@@ -164,10 +171,17 @@ func getDomesticDefaultCatalog() ([]upstreamVendor, []upstreamModel) {
 		domesticModel("jimeng_high_aes_general_v21_L", "即梦", "即梦高清图像生成模型。", "Jimeng.Color", "国产,图像", []string{"image-generation"}),
 		domesticModel("jimeng_vgfm_t2v_l20", "即梦", "即梦视频生成模型。", "Jimeng.Color", "国产,视频,文生视频", []string{"openai-video"}),
 
-		domesticModel("viduq2", "Vidu", "Vidu Q2 视频生成模型，适合参考图和高质量视频生成。", "Vidu", "国产,视频", []string{"openai-video"}),
-		domesticModel("viduq1", "Vidu", "Vidu Q1 视频生成模型，适合基础文生视频和图生视频。", "Vidu", "国产,视频", []string{"openai-video"}),
-		domesticModel("vidu2.0", "Vidu", "Vidu 2.0 视频生成模型。", "Vidu", "国产,视频", []string{"openai-video"}),
-		domesticModel("vidu1.5", "Vidu", "Vidu 1.5 视频生成模型。", "Vidu", "国产,视频", []string{"openai-video"}),
+		domesticModel("viduq3-turbo", "Vidu", "Vidu Q3 Turbo 视频生成模型，适合更快的图生、文生和首尾帧视频。", "Vidu", "国产,视频,图生视频,文生视频,首尾帧,有声视频", []string{"openai-video"}),
+		domesticModel("viduq3-pro", "Vidu", "Vidu Q3 Pro 高质量视频生成模型，适合图生、文生和首尾帧视频。", "Vidu", "国产,视频,图生视频,文生视频,首尾帧,有声视频", []string{"openai-video"}),
+		domesticModel("viduq3-pro-fast", "Vidu", "Vidu Q3 Pro Fast 高效视频生成模型，适合高性价比图生视频。", "Vidu", "国产,视频,图生视频,有声视频", []string{"openai-video"}),
+		domesticModel("viduq2-pro-fast", "Vidu", "Vidu Q2 Pro Fast 图生和首尾帧视频模型，适合低成本快速生成。", "Vidu", "国产,视频,图生视频,首尾帧", []string{"openai-video"}),
+		domesticModel("viduq2-pro", "Vidu", "Vidu Q2 Pro 图生、首尾帧和参考生视频模型，适合高质量细节生成。", "Vidu", "国产,视频,图生视频,首尾帧,参考生视频", []string{"openai-video"}),
+		domesticModel("viduq2-turbo", "Vidu", "Vidu Q2 Turbo 图生和首尾帧视频模型，适合更快的视频生成。", "Vidu", "国产,视频,图生视频,首尾帧", []string{"openai-video"}),
+		domesticModel("viduq2", "Vidu", "Vidu Q2 图片与视频生成模型，支持文生图、图片编辑、参考生图、文生视频和参考生视频；平台生图默认按 4K 输出口径使用。", "Vidu", "国产,图像,编辑,视频,文生图,参考生图,4K,文生视频,参考生视频", []string{"openai-video", "image-generation"}),
+		domesticModel("viduq1", "Vidu", "Vidu Q1 图片与视频生成模型，支持参考生图、基础文生、图生、首尾帧和参考生视频。", "Vidu", "国产,图像,视频,参考生图,图生视频,文生视频,首尾帧,参考生视频", []string{"openai-video", "image-generation"}),
+		domesticModel("viduq1-classic", "Vidu", "Vidu Q1 Classic 图生和首尾帧视频模型，适合更丰富的转场和运镜。", "Vidu", "国产,视频,图生视频,首尾帧", []string{"openai-video"}),
+		domesticModel("vidu2.0", "Vidu", "Vidu 2.0 视频生成模型，适合快速图生、首尾帧和参考生视频。", "Vidu", "国产,视频,图生视频,首尾帧,参考生视频", []string{"openai-video"}),
+		domesticModel("vidu1.5", "Vidu", "Vidu 1.5 旧版兼容视频生成模型。", "Vidu", "国产,视频,兼容", []string{"openai-video"}),
 	}
 
 	return vendors, models

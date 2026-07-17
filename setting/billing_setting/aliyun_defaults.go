@@ -92,6 +92,42 @@ func aliTieredExpr(tiers []aliTier, thinkingExpr, cacheMode string) string {
 	return builder.String()
 }
 
+func aliInputOnlyExpr(tierName string, inputPricePerMillionUnits float64) string {
+	return fmt.Sprintf(`tier("%s", p * %g)`, tierName, inputPricePerMillionUnits)
+}
+
+func aliAudioSecondsExpr(cnyPerSecond float64) string {
+	return aliInputOnlyExpr("audio_seconds", cnyPerSecond*60000)
+}
+
+func aliTTSCharactersExpr(cnyPerTenThousandChars float64) string {
+	return aliInputOnlyExpr("characters", cnyPerTenThousandChars*100)
+}
+
+func aliAudioBillingExprMap() map[string]string {
+	return map[string]string{
+		"paraformer-v2":                       aliAudioSecondsExpr(0.00008),
+		"paraformer-8k-v2":                    aliAudioSecondsExpr(0.00008),
+		"paraformer-v1":                       aliAudioSecondsExpr(0.00008),
+		"paraformer-8k-v1":                    aliAudioSecondsExpr(0.00008),
+		"paraformer-mtl-v1":                   aliAudioSecondsExpr(0.00008),
+		"fun-asr":                             aliAudioSecondsExpr(0.00022),
+		"fun-asr-2025-11-07":                  aliAudioSecondsExpr(0.00022),
+		"fun-asr-2025-08-25":                  aliAudioSecondsExpr(0.00022),
+		"fun-asr-mtl":                         aliAudioSecondsExpr(0.00022),
+		"fun-asr-mtl-2025-08-25":              aliAudioSecondsExpr(0.00022),
+		"cosyvoice-v3.5-plus":                 aliTTSCharactersExpr(1.5),
+		"cosyvoice-v3.5-flash":                aliTTSCharactersExpr(0.8),
+		"cosyvoice-v3-plus":                   aliTTSCharactersExpr(2),
+		"cosyvoice-v3-flash":                  aliTTSCharactersExpr(1),
+		"cosyvoice-v2":                        aliTTSCharactersExpr(2),
+		"cosyvoice-v1":                        aliTTSCharactersExpr(2),
+		"qwen3-tts-instruct-flash":            aliTTSCharactersExpr(0.8),
+		"qwen3-tts-instruct-flash-2026-01-26": aliTTSCharactersExpr(0.8),
+		"qwen3-tts-vc-2026-01-22":             aliTTSCharactersExpr(0.8),
+	}
+}
+
 func defaultBillingModeMap() map[string]string {
 	modeMap := make(map[string]string)
 	for _, model := range []string{
@@ -111,6 +147,12 @@ func defaultBillingModeMap() map[string]string {
 		"qwen3-coder-flash",
 		"qwen3-coder-next",
 	} {
+		modeMap[model] = BillingModeTieredExpr
+	}
+	for model := range aliAudioBillingExprMap() {
+		modeMap[model] = BillingModeTieredExpr
+	}
+	for model := range defaultDeepSeekBillingExprMap() {
 		modeMap[model] = BillingModeTieredExpr
 	}
 	for model, mode := range defaultVolcEngineBillingModeMap() {
@@ -190,6 +232,12 @@ func defaultBillingExprMap() map[string]string {
 			{Name: "32k-128k", MaxLen: 128000, InputPrice: 1.5, OutputPrice: 6},
 			{Name: "128k-256k", InputPrice: 2.5, OutputPrice: 10},
 		}, "", aliCacheModeNone),
+	}
+	for model, expr := range aliAudioBillingExprMap() {
+		exprMap[model] = expr
+	}
+	for model, expr := range defaultDeepSeekBillingExprMap() {
+		exprMap[model] = expr
 	}
 	for model, expr := range defaultVolcEngineBillingExprMap() {
 		exprMap[model] = expr

@@ -12,10 +12,16 @@ import (
 type AudioRequest struct {
 	Model          string          `json:"model"`
 	Input          string          `json:"input"`
+	FileURL        string          `json:"file_url,omitempty"`
 	Voice          string          `json:"voice"`
 	Instructions   string          `json:"instructions,omitempty"`
 	ResponseFormat string          `json:"response_format,omitempty"`
 	Speed          *float64        `json:"speed,omitempty"`
+	SampleRate     *int            `json:"sample_rate,omitempty"`
+	Volume         *int            `json:"volume,omitempty"`
+	Pitch          *float64        `json:"pitch,omitempty"`
+	LanguageType   string          `json:"language_type,omitempty"`
+	LanguageHints  []string        `json:"language_hints,omitempty"`
 	StreamFormat   string          `json:"stream_format,omitempty"`
 	Metadata       json.RawMessage `json:"metadata,omitempty"`
 	// vllm-omini

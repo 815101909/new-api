@@ -19,6 +19,7 @@ import {
 } from '@tanstack/react-table'
 import { useMediaQuery } from '@/hooks'
 import { AlertTriangle, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -52,6 +53,10 @@ import {
   ModelPricingSheet,
   type ModelRatioData,
 } from './model-pricing-sheet'
+import {
+  getDynamicRequestPricingProfileKey,
+  isDynamicRequestPricingModel,
+} from './dynamic-request-pricing'
 
 type ModelRatioVisualEditorProps = {
   modelPrice: string
@@ -171,13 +176,23 @@ const getModeLabel = (mode?: string) => {
   return 'Per-token'
 }
 
+const getDisplayModeLabel = (row: ModelRow) => {
+  if (
+    row.billingMode === 'per-request' &&
+    isDynamicRequestPricingModel(row.name)
+  ) {
+    return 'Dynamic per-request'
+  }
+  return getModeLabel(row.billingMode)
+}
+
 const getModeVariant = (mode?: string): 'warning' | 'info' | 'success' => {
   if (mode === 'per-request') return 'warning'
   if (mode === 'tiered_expr') return 'info'
   return 'success'
 }
 
-const getExpressionSummary = (row: ModelRow, t: (key: string) => string) => {
+const getExpressionSummary = (row: ModelRow, t: TFunction) => {
   const tierCount = (row.billingExpr?.match(/tier\(/g) || []).length
   if (tierCount > 0) {
     return `${t('Tiered pricing')} · ${tierCount} ${t('tiers')}`
@@ -185,13 +200,16 @@ const getExpressionSummary = (row: ModelRow, t: (key: string) => string) => {
   return t('Expression pricing')
 }
 
-const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
+const getPriceSummary = (row: ModelRow, t: TFunction) => {
   if (row.billingMode === 'tiered_expr') {
     return getExpressionSummary(row, t)
   }
   if (row.billingMode === 'per-request') {
+    const suffix = isDynamicRequestPricingModel(row.name)
+      ? t('base price')
+      : t('request')
     return row.price
-      ? `${formatPriceWithCurrency(row.price)} / ${t('request')}`
+      ? `${formatPriceWithCurrency(row.price)} / ${suffix}`
       : t('Unset price')
   }
 
@@ -212,13 +230,22 @@ const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
     : `${t('Input')} ${formatPriceWithCurrency(inputPrice)}`
 }
 
-const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
+const getPriceDetail = (row: ModelRow, t: TFunction) => {
   if (row.billingMode === 'tiered_expr') {
     return row.requestRuleExpr
       ? t('Includes request rules')
       : t('Expression based')
   }
   if (row.billingMode === 'per-request') {
+    const profileKey = getDynamicRequestPricingProfileKey(row.name)
+    if (profileKey) {
+      return t(
+        '{{profile}}; actual billing follows duration, resolution, off-peak and generation options.',
+        {
+          profile: t(profileKey),
+        }
+      )
+    }
     return t('Fixed request price')
   }
 
@@ -880,7 +907,7 @@ export const ModelRatioVisualEditor = memo(
           ),
           cell: ({ row }) => (
             <StatusBadge
-              label={t(getModeLabel(row.original.billingMode))}
+              label={t(getDisplayModeLabel(row.original))}
               variant={getModeVariant(row.original.billingMode)}
               copyable={false}
             />

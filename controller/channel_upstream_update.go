@@ -282,6 +282,10 @@ func mergeVolcEngineKnownModelNames(models []string) []string {
 }
 
 func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
+	if models, ok := getStaticFetchModelIDs(channel.Type); ok {
+		return normalizeModelNames(models), nil
+	}
+
 	baseURL := constant.ChannelBaseURLs[channel.Type]
 	if channel.GetBaseURL() != "" {
 		baseURL = channel.GetBaseURL()

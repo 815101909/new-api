@@ -32,6 +32,16 @@ const (
 type Adaptor struct {
 }
 
+func isDoubaoSeedreamImageModel(modelNames ...string) bool {
+	for _, modelName := range modelNames {
+		normalizedModel := strings.ToLower(strings.TrimSpace(modelName))
+		if strings.HasPrefix(normalizedModel, "doubao-seedream") {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
 	//TODO implement me
 	return nil, errors.New("not implemented")
@@ -106,6 +116,15 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
+	upstreamModelName := ""
+	if info.ChannelMeta != nil {
+		upstreamModelName = info.UpstreamModelName
+	}
+	if isDoubaoSeedreamImageModel(request.Model, upstreamModelName) {
+		watermark := false
+		request.Watermark = &watermark
+	}
+
 	switch info.RelayMode {
 	case constant.RelayModeImagesGenerations:
 		return request, nil

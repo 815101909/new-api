@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,6 +187,29 @@ func countLogs(t *testing.T) int64 {
 	return count
 }
 
+func seedTaskConsumeLog(t *testing.T, userId int, tokenId int, channelId int, taskId string, quota int) *model.Log {
+	t.Helper()
+	log := &model.Log{
+		UserId:    userId,
+		Username:  "test_user",
+		CreatedAt: time.Now().Unix(),
+		Type:      model.LogTypeConsume,
+		Content:   "操作 generate",
+		TokenName: "test_token",
+		ModelName: "test-model",
+		Quota:     quota,
+		ChannelId: channelId,
+		TokenId:   tokenId,
+		Group:     "default",
+		Other: common.MapToJsonStr(map[string]interface{}{
+			"is_task": true,
+			"task_id": taskId,
+		}),
+	}
+	require.NoError(t, model.LOG_DB.Create(log).Error)
+	return log
+}
+
 // ===========================================================================
 // RefundTaskQuota tests
 // ===========================================================================
@@ -289,6 +315,37 @@ func TestRefundTaskQuota_NoToken(t *testing.T) {
 	assert.Equal(t, model.LogTypeRefund, log.Type)
 }
 
+func TestRefundTaskQuota_SyncsInitialConsumeLogUseTime(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 5, 5, 5
+	const initQuota, preConsumed = 10000, 1800
+	const tokenRemain = 4000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-sync-refund", tokenRemain)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.SubmitTime = 100
+	task.StartTime = 120
+	task.FinishTime = 165
+
+	initialLog := seedTaskConsumeLog(t, userID, tokenID, channelID, task.TaskID, preConsumed)
+
+	RefundTaskQuota(ctx, task, "task failed after processing")
+
+	var updatedConsume model.Log
+	require.NoError(t, model.LOG_DB.First(&updatedConsume, initialLog.Id).Error)
+	assert.Equal(t, 45, updatedConsume.UseTime)
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Equal(t, model.LogTypeRefund, log.Type)
+	assert.Equal(t, 45, log.UseTime)
+}
+
 // ===========================================================================
 // RecalculateTaskQuota tests
 // ===========================================================================
@@ -377,6 +434,34 @@ func TestRecalculate_ZeroDelta(t *testing.T) {
 
 	// No log created (delta is zero)
 	assert.Equal(t, int64(0), countLogs(t))
+}
+
+func TestRecalculate_ZeroDelta_SyncsInitialConsumeLogUseTime(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 121, 121, 121
+	const initQuota, preConsumed = 10000, 3000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-zero-delta-sync", 6000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.SubmitTime = 100
+	task.StartTime = 130
+	task.FinishTime = 170
+
+	initialLog := seedTaskConsumeLog(t, userID, tokenID, channelID, task.TaskID, preConsumed)
+
+	RecalculateTaskQuota(ctx, task, preConsumed, "exact match")
+
+	assert.Equal(t, initQuota, getUserQuota(t, userID))
+	assert.Equal(t, int64(1), countLogs(t))
+
+	var updatedConsume model.Log
+	require.NoError(t, model.LOG_DB.First(&updatedConsume, initialLog.Id).Error)
+	assert.Equal(t, 40, updatedConsume.UseTime)
 }
 
 func TestRecalculate_ActualQuotaZero(t *testing.T) {
@@ -682,6 +767,82 @@ func TestSettle_PerCallBilling_SkipsTotalTokens(t *testing.T) {
 	assert.Equal(t, tokenRemain, getTokenRemainQuota(t, tokenID))
 	assert.Equal(t, preConsumed, task.Quota)
 	assert.Equal(t, int64(0), countLogs(t))
+}
+
+func TestSettle_PerCallBilling_SyncsInitialConsumeLogUseTime(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 311, 311, 311
+	const initQuota, preConsumed = 10000, 4000
+	const tokenRemain = 7000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-percall-sync", tokenRemain)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.PrivateData.BillingContext.PerCallBilling = true
+	task.SubmitTime = 100
+	task.StartTime = 150
+	task.FinishTime = 210
+
+	initialLog := seedTaskConsumeLog(t, userID, tokenID, channelID, task.TaskID, preConsumed)
+
+	adaptor := &mockAdaptor{adjustReturn: 2000}
+	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusSuccess}
+
+	settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
+
+	assert.Equal(t, initQuota, getUserQuota(t, userID))
+	assert.Equal(t, tokenRemain, getTokenRemainQuota(t, tokenID))
+	assert.Equal(t, int64(1), countLogs(t))
+
+	var updatedConsume model.Log
+	require.NoError(t, model.LOG_DB.First(&updatedConsume, initialLog.Id).Error)
+	assert.Equal(t, 60, updatedConsume.UseTime)
+}
+
+func TestLogTaskConsumption_IncludesPublicTaskID(t *testing.T) {
+	truncate(t)
+
+	const userID, tokenID, channelID = 401, 401, 401
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-log-task-id", 8000)
+	seedChannel(t, channelID)
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+	ctx.Set("username", "test_user")
+	ctx.Set("token_name", "test_token")
+
+	info := &relaycommon.RelayInfo{
+		UserId:     userID,
+		TokenId:    tokenID,
+		UsingGroup: "default",
+		PriceData: types.PriceData{
+			Quota: 1234,
+			GroupRatioInfo: types.GroupRatioInfo{
+				GroupRatio: 1.0,
+			},
+		},
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId: channelID,
+		},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			Action:       "generate",
+			PublicTaskID: "task_log_task_id",
+		},
+	}
+	info.OriginModelName = "test-model"
+
+	LogTaskConsumption(ctx, info)
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Equal(t, model.LogTypeConsume, log.Type)
+	assert.Contains(t, log.Other, "\"task_id\":\"task_log_task_id\"")
 }
 
 func TestSettle_NonPerCall_AdaptorAdjustWorks(t *testing.T) {
