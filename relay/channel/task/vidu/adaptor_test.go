@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -33,6 +34,30 @@ func TestViduAuthorizationTypeAppliesToSubmitAndPolling(t *testing.T) {
 	require.Equal(t, "Bearer test-key", req.Header.Get("Authorization"))
 
 	require.Equal(t, "Bearer polling-key", adaptor.authorizationHeader("polling-key"))
+}
+
+func TestViduInputReferenceUsesImageToVideoEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader(`{"prompt":"move the character","model":"viduq3-turbo","input_reference":"https://example.com/frame.png"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:    constant.ChannelTypeVidu,
+			ChannelBaseUrl: "https://yunwu.ai",
+		},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{},
+	}
+
+	taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(c, info)
+	require.Nil(t, taskErr)
+	require.Equal(t, constant.TaskActionGenerate, info.Action)
+
+	requestURL, err := (&TaskAdaptor{baseURL: info.ChannelBaseUrl}).BuildRequestURL(info)
+	require.NoError(t, err)
+	require.Equal(t, "https://yunwu.ai/ent/v2/img2video", requestURL)
 }
 
 func TestViduEstimateCredits_Q3AndOffPeak(t *testing.T) {

@@ -214,9 +214,14 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 		return taskErr
 	}
 
-	if len(req.Images) == 0 && strings.TrimSpace(req.Image) != "" {
-		// 兼容单图上传
-		req.Images = []string{req.Image}
+	if len(req.Images) == 0 {
+		if inputReference := strings.TrimSpace(req.InputReference); inputReference != "" {
+			// OpenAI 视频接口使用 input_reference 传入参考图。
+			req.Images = []string{inputReference}
+		} else if image := strings.TrimSpace(req.Image); image != "" {
+			// 兼容单图上传
+			req.Images = []string{image}
+		}
 	}
 
 	storeTaskRequest(c, info, action, req)
