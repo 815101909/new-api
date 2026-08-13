@@ -560,7 +560,7 @@ func fetchViduImageTask(info *relaycommon.RelayInfo, taskID string) (*imageTaskR
 		return nil, nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Token "+info.ApiKey)
+	req.Header.Set("Authorization", info.ChannelOtherSettings.GetViduAuthorizationHeader(info.ApiKey))
 
 	client, err := service.GetHttpClientWithProxy(info.ChannelSetting.Proxy)
 	if err != nil {

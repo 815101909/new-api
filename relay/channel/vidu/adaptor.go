@@ -39,7 +39,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	channel.SetupApiRequestHeader(info, c, req)
 	req.Set("Content-Type", "application/json")
 	req.Set("Accept", "application/json")
-	req.Set("Authorization", "Token "+info.ApiKey)
+	req.Set("Authorization", info.ChannelOtherSettings.GetViduAuthorizationHeader(info.ApiKey))
 	return nil
 }
 

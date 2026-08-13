@@ -11,10 +11,29 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestViduAuthorizationTypeAppliesToSubmitAndPolling(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ApiKey: "test-key",
+		ChannelOtherSettings: dto.ChannelOtherSettings{
+			ViduAuthorizationType: dto.ViduAuthorizationTypeBearer,
+		},
+	}}
+	adaptor := &TaskAdaptor{}
+	adaptor.Init(info)
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	require.NoError(t, adaptor.BuildRequestHeader(nil, req, info))
+	require.Equal(t, "Bearer test-key", req.Header.Get("Authorization"))
+
+	require.Equal(t, "Bearer polling-key", adaptor.authorizationHeader("polling-key"))
+}
 
 func TestViduEstimateCredits_Q3AndOffPeak(t *testing.T) {
 	credits, ok := viduEstimateCredits(&requestPayload{

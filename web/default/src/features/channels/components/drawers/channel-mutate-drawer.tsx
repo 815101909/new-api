@@ -1792,6 +1792,44 @@ export function ChannelMutateDrawer({
                   />
                 )}
 
+                {currentType === 52 && Boolean(currentBaseUrl?.trim()) && (
+                  <FormField
+                    control={form.control}
+                    name='vidu_authorization_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Authorization Type')}</FormLabel>
+                        <Select
+                          items={[
+                            { value: 'token', label: 'Token' },
+                            { value: 'bearer', label: 'Bearer' },
+                          ]}
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent alignItemWithTrigger={false}>
+                            <SelectGroup>
+                              <SelectItem value='token'>Token</SelectItem>
+                              <SelectItem value='bearer'>Bearer</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {field.value === 'bearer'
+                            ? t('Use Bearer authentication for third-party Vidu proxies.')
+                            : t('Use Token authentication for the official Vidu API.')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <div className='border-border/60 border-t pt-4'>
                   <SubHeading
                     title={t('Authentication')}

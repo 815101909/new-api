@@ -68,6 +68,22 @@ func TestConvertImageRequestWithMultipartReference(t *testing.T) {
 	require.True(t, strings.HasPrefix(payload.Images[0], "data:image/png;base64,"))
 }
 
+func TestViduImageAuthorizationType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ApiKey: "test-key",
+		ChannelOtherSettings: dto.ChannelOtherSettings{
+			ViduAuthorizationType: dto.ViduAuthorizationTypeBearer,
+		},
+	}}
+	adaptor := &Adaptor{}
+	header := http.Header{}
+	require.NoError(t, adaptor.SetupRequestHeader(context, &header, info))
+	require.Equal(t, "Bearer test-key", header.Get("Authorization"))
+}
+
 func TestViduImageCreditsUseOfficialImageTiers(t *testing.T) {
 	require.Equal(t, 10, estimateViduImageCredits("viduq2", 0, "4K"))
 	require.Equal(t, 20, estimateViduImageCredits("viduq2", 3, "4K"))

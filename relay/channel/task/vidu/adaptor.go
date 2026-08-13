@@ -91,13 +91,20 @@ type creation struct {
 
 type TaskAdaptor struct {
 	taskcommon.BaseBilling
-	ChannelType int
-	baseURL     string
+	ChannelType       int
+	baseURL           string
+	authorizationType dto.ViduAuthorizationType
 }
 
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.ChannelType = info.ChannelType
 	a.baseURL = info.ChannelBaseUrl
+	a.authorizationType = info.ChannelOtherSettings.ViduAuthorizationType
+}
+
+func (a *TaskAdaptor) authorizationHeader(apiKey string) string {
+	settings := dto.ChannelOtherSettings{ViduAuthorizationType: a.authorizationType}
+	return settings.GetViduAuthorizationHeader(apiKey)
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
@@ -173,7 +180,7 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Token "+info.ApiKey)
+	req.Header.Set("Authorization", info.ChannelOtherSettings.GetViduAuthorizationHeader(info.ApiKey))
 	return nil
 }
 
@@ -223,7 +230,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Token "+key)
+	req.Header.Set("Authorization", a.authorizationHeader(key))
 
 	client, err := service.GetHttpClientWithProxy(proxy)
 	if err != nil {

@@ -47,6 +47,7 @@ export const channelFormSchema = z.object({
   is_enterprise_account: z.boolean().optional(), // OpenRouter specific
   vertex_key_type: z.enum(['json', 'api_key']).optional(), // Vertex AI specific
   aws_key_type: z.enum(['ak_sk', 'api_key']).optional(), // AWS specific
+  vidu_authorization_type: z.enum(['token', 'bearer']).optional(), // Vidu specific
   azure_responses_version: z.string().optional(), // Azure specific
   // Field passthrough controls (stored in settings JSON)
   allow_service_tier: z.boolean().optional(), // OpenAI/Anthropic
@@ -105,6 +106,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   is_enterprise_account: false,
   vertex_key_type: 'json',
   aws_key_type: 'ak_sk',
+  vidu_authorization_type: 'token',
   azure_responses_version: '',
   // Field passthrough controls
   allow_service_tier: false,
@@ -161,6 +163,7 @@ export function transformChannelToFormDefaults(
   let azureResponsesVersion = ''
   let isEnterpriseAccount = false
   let awsKeyType: 'ak_sk' | 'api_key' = 'ak_sk'
+  let viduAuthorizationType: 'token' | 'bearer' = 'token'
   let allowServiceTier = false
   let disableStore = false
   let allowSafetyIdentifier = false
@@ -179,6 +182,8 @@ export function transformChannelToFormDefaults(
       azureResponsesVersion = parsed.azure_responses_version || ''
       isEnterpriseAccount = parsed.openrouter_enterprise === true
       awsKeyType = parsed.aws_key_type || 'ak_sk'
+      viduAuthorizationType =
+        parsed.vidu_authorization_type === 'bearer' ? 'bearer' : 'token'
       allowServiceTier = parsed.allow_service_tier === true
       disableStore = parsed.disable_store === true
       allowSafetyIdentifier = parsed.allow_safety_identifier === true
@@ -234,6 +239,7 @@ export function transformChannelToFormDefaults(
     vertex_key_type: vertexKeyType,
     azure_responses_version: azureResponsesVersion,
     aws_key_type: awsKeyType,
+    vidu_authorization_type: viduAuthorizationType,
     allow_service_tier: allowServiceTier,
     disable_store: disableStore,
     allow_include_obfuscation: allowIncludeObfuscation,
@@ -304,6 +310,14 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     settingsObj.aws_key_type = formData.aws_key_type || 'ak_sk'
   } else if ('aws_key_type' in settingsObj) {
     delete settingsObj.aws_key_type
+  }
+
+  // Add authorization type for Vidu channels (type 52)
+  if (formData.type === 52) {
+    settingsObj.vidu_authorization_type =
+      formData.vidu_authorization_type || 'token'
+  } else if ('vidu_authorization_type' in settingsObj) {
+    delete settingsObj.vidu_authorization_type
   }
 
   // Field passthrough controls:
