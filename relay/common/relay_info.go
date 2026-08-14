@@ -673,6 +673,10 @@ type TaskRelayInfo struct {
 	LockedChannel any
 }
 
+const ContextKeyAsyncTaskSubmitter = "async_task_submitter"
+
+type AsyncTaskSubmitter func()
+
 func (info *RelayInfo) IsVideoSubmitRelay() bool {
 	return info != nil && info.RelayMode == relayconstant.RelayModeVideoSubmit
 }

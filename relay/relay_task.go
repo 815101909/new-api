@@ -27,6 +27,7 @@ type TaskSubmitResult struct {
 	TaskData       []byte
 	Platform       constant.TaskPlatform
 	Quota          int
+	AsyncSubmitter relaycommon.AsyncTaskSubmitter
 	//PerCallPrice   types.PriceData
 }
 
@@ -260,7 +261,20 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		TaskData:       taskData,
 		Platform:       platform,
 		Quota:          finalQuota,
+		AsyncSubmitter: getAsyncTaskSubmitter(c),
 	}, nil
+}
+
+func getAsyncTaskSubmitter(c *gin.Context) relaycommon.AsyncTaskSubmitter {
+	if c == nil {
+		return nil
+	}
+	value, exists := c.Get(relaycommon.ContextKeyAsyncTaskSubmitter)
+	if !exists {
+		return nil
+	}
+	submitter, _ := value.(relaycommon.AsyncTaskSubmitter)
+	return submitter
 }
 
 // recalcQuotaFromRatios 根据 adjustedRatios 重新计算 quota。

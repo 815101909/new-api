@@ -13,10 +13,105 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
+
+func TestViduVideoSubmitReturnsLocalTaskBeforeUpstreamRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader("request body"))
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:    constant.ChannelTypeVidu,
+			ChannelBaseUrl: "https://example.com",
+			ApiKey:         "test-key",
+		},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			PublicTaskID: "task_local",
+		},
+		RelayMode:       relayconstant.RelayModeVideoSubmit,
+		OriginModelName: "viduq3-turbo",
+	}
+	adaptor := &TaskAdaptor{}
+	adaptor.Init(info)
+
+	resp, err := adaptor.DoRequest(c, info, strings.NewReader("upstream request"))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(body), `"state":"created"`)
+
+	value, exists := c.Get(relaycommon.ContextKeyAsyncTaskSubmitter)
+	require.True(t, exists)
+	require.IsType(t, relaycommon.AsyncTaskSubmitter(nil), value)
+}
+
+func TestViduBackgroundSubmitStoresUpstreamTaskID(t *testing.T) {
+	service.InitHttpClient()
+
+	oldDB := model.DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	model.DB = db
+	t.Cleanup(func() {
+		model.DB = oldDB
+	})
+	require.NoError(t, db.AutoMigrate(&model.Task{}))
+
+	task := &model.Task{
+		TaskID:   "task_local",
+		Platform: constant.TaskPlatform("52"),
+		Status:   model.TaskStatusSubmitted,
+		Progress: "0%",
+		PrivateData: model.TaskPrivateData{
+			UpstreamSubmitting: true,
+		},
+	}
+	require.NoError(t, task.Insert())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/ent/v2/img2video", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"task_id":"upstream-123","state":"created","model":"viduq3-turbo"}`))
+	}))
+	defer server.Close()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader(""))
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:    constant.ChannelTypeVidu,
+			ChannelBaseUrl: server.URL,
+			ApiKey:         "test-key",
+		},
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			Action:       constant.TaskActionGenerate,
+			PublicTaskID: "task_local",
+		},
+	}
+	adaptor := &TaskAdaptor{}
+	adaptor.Init(info)
+
+	adaptor.submitUpstreamInBackground(c, info, []byte(`{"prompt":"move"}`))
+
+	updatedTask, exists, err := model.GetByOnlyTaskId("task_local")
+	require.NoError(t, err)
+	require.True(t, exists)
+	require.False(t, updatedTask.PrivateData.UpstreamSubmitting)
+	require.Equal(t, model.TaskStatus(model.TaskStatusSubmitted), updatedTask.Status, updatedTask.FailReason)
+	require.Equal(t, "upstream-123", updatedTask.PrivateData.UpstreamTaskID, updatedTask.FailReason)
+}
 
 func TestViduAuthorizationTypeAppliesToSubmitAndPolling(t *testing.T) {
 	gin.SetMode(gin.TestMode)

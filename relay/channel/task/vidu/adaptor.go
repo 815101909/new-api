@@ -2,6 +2,7 @@ package vidu
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -185,6 +186,35 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 }
 
 func (a *TaskAdaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (*http.Response, error) {
+	if info.IsVideoSubmitRelay() {
+		body, err := io.ReadAll(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("read async request body failed: %w", err)
+		}
+		adaptorCopy := *a
+		infoCopy := *info
+		backgroundContext := c.Copy()
+		if c.Request != nil {
+			backgroundContext.Request = c.Request.Clone(context.Background())
+			backgroundContext.Request.Body = io.NopCloser(bytes.NewReader(nil))
+		}
+		c.Set(relaycommon.ContextKeyAsyncTaskSubmitter, relaycommon.AsyncTaskSubmitter(func() {
+			adaptorCopy.submitUpstreamInBackground(backgroundContext, &infoCopy, body)
+		}))
+
+		queuedBody, err := common.Marshal(responsePayload{
+			State: "created",
+			Model: info.OriginModelName,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader(queuedBody)),
+			Header:     make(http.Header),
+		}, nil
+	}
 	return channel.DoTaskApiRequest(a, c, info, requestBody)
 }
 
@@ -196,12 +226,10 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	}
 
 	var vResp responsePayload
-	err = common.Unmarshal(responseBody, &vResp)
-	if err != nil {
+	if err := common.Unmarshal(responseBody, &vResp); err != nil {
 		taskErr = service.TaskErrorWrapper(errors.Wrap(err, fmt.Sprintf("%s", responseBody)), "unmarshal_response_failed", http.StatusInternalServerError)
 		return
 	}
-
 	if vResp.State == "failed" {
 		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf("task failed"), "task_failed", http.StatusBadRequest)
 		return
@@ -214,6 +242,98 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	ov.Model = info.OriginModelName
 	c.JSON(http.StatusOK, ov)
 	return vResp.TaskId, responseBody, nil
+}
+
+func parseViduSubmitResponse(responseBody []byte, requireTaskID bool) (*responsePayload, error) {
+	var vResp responsePayload
+	if err := common.Unmarshal(responseBody, &vResp); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("%s", responseBody))
+	}
+	if vResp.State == "failed" {
+		return nil, fmt.Errorf("task failed")
+	}
+	if requireTaskID && strings.TrimSpace(vResp.TaskId) == "" {
+		return nil, fmt.Errorf("upstream task id is empty")
+	}
+	return &vResp, nil
+}
+
+func (a *TaskAdaptor) submitUpstreamInBackground(c *gin.Context, info *relaycommon.RelayInfo, requestBody []byte) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			a.finishAsyncSubmitFailure(info.PublicTaskID, fmt.Sprintf("submit upstream panic: %v", recovered))
+		}
+	}()
+
+	resp, err := channel.DoTaskApiRequest(a, c, info, bytes.NewReader(requestBody))
+	if err != nil {
+		a.finishAsyncSubmitFailure(info.PublicTaskID, err.Error())
+		return
+	}
+	if resp == nil {
+		a.finishAsyncSubmitFailure(info.PublicTaskID, "upstream response is nil")
+		return
+	}
+	defer resp.Body.Close()
+
+	responseBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		a.finishAsyncSubmitFailure(info.PublicTaskID, readErr.Error())
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		a.finishAsyncSubmitFailure(info.PublicTaskID, fmt.Sprintf("upstream HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(responseBody))))
+		return
+	}
+
+	vResp, parseErr := parseViduSubmitResponse(responseBody, true)
+	if parseErr != nil {
+		a.finishAsyncSubmitFailure(info.PublicTaskID, parseErr.Error())
+		return
+	}
+
+	task, exists, getErr := model.GetByOnlyTaskId(info.PublicTaskID)
+	if getErr != nil || !exists {
+		common.SysLog(fmt.Sprintf("async Vidu task %s not found after upstream submit: %v", info.PublicTaskID, getErr))
+		return
+	}
+	oldStatus := task.Status
+	task.PrivateData.UpstreamTaskID = vResp.TaskId
+	task.PrivateData.UpstreamSubmitting = false
+	task.Status = model.TaskStatusSubmitted
+	task.StartTime = time.Now().Unix()
+	task.SetData(vResp)
+	if won, updateErr := task.UpdateWithStatus(oldStatus); updateErr != nil {
+		common.SysLog(fmt.Sprintf("update async Vidu task %s failed: %s", info.PublicTaskID, updateErr.Error()))
+	} else if !won {
+		common.SysLog(fmt.Sprintf("async Vidu task %s status changed before upstream submit completed", info.PublicTaskID))
+	}
+}
+
+func (a *TaskAdaptor) finishAsyncSubmitFailure(publicTaskID string, reason string) {
+	task, exists, err := model.GetByOnlyTaskId(publicTaskID)
+	if err != nil || !exists {
+		common.SysLog(fmt.Sprintf("async Vidu task %s not found after submit failure: %v", publicTaskID, err))
+		return
+	}
+	oldStatus := task.Status
+	task.PrivateData.UpstreamSubmitting = false
+	task.Status = model.TaskStatusFailure
+	task.Progress = "100%"
+	task.FinishTime = time.Now().Unix()
+	task.FailReason = strings.TrimSpace(reason)
+	task.SetData(map[string]any{
+		"state":    "failed",
+		"err_code": task.FailReason,
+	})
+	won, updateErr := task.UpdateWithStatus(oldStatus)
+	if updateErr != nil {
+		common.SysLog(fmt.Sprintf("update failed async Vidu task %s failed: %s", publicTaskID, updateErr.Error()))
+		return
+	}
+	if won {
+		service.RefundTaskQuota(context.Background(), task, task.FailReason)
+	}
 }
 
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
