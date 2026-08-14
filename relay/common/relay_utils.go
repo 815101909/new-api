@@ -86,15 +86,25 @@ func validateMultipartTaskRequest(c *gin.Context, info *RelayInfo, action string
 
 	formData := c.Request.PostForm
 	req = TaskSubmitReq{
-		Prompt:   formData.Get("prompt"),
-		Model:    formData.Get("model"),
-		Mode:     formData.Get("mode"),
-		Image:    formData.Get("image"),
-		Size:     formData.Get("size"),
-		Metadata: make(map[string]interface{}),
+		Prompt:         formData.Get("prompt"),
+		Model:          formData.Get("model"),
+		Mode:           formData.Get("mode"),
+		Image:          formData.Get("image"),
+		Size:           formData.Get("size"),
+		Seconds:        formData.Get("seconds"),
+		InputReference: formData.Get("input_reference"),
+		Metadata:       make(map[string]interface{}),
 	}
 
-	if durationStr := formData.Get("seconds"); durationStr != "" {
+	if metadataStr := strings.TrimSpace(formData.Get("metadata")); metadataStr != "" {
+		_ = common.Unmarshal([]byte(metadataStr), &req.Metadata)
+	}
+
+	durationStr := formData.Get("duration")
+	if durationStr == "" {
+		durationStr = req.Seconds
+	}
+	if durationStr != "" {
 		if duration, err := strconv.Atoi(durationStr); err == nil {
 			req.Duration = duration
 		}
@@ -190,7 +200,9 @@ func isKnownTaskField(field string) bool {
 		"images":          true,
 		"size":            true,
 		"duration":        true,
+		"seconds":         true,
 		"input_reference": true, // Sora 特有字段
+		"metadata":        true,
 	}
 	return knownFields[field]
 }
@@ -204,10 +216,10 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 		if err != nil {
 			return createTaskError(err, "invalid_multipart_form", http.StatusBadRequest, true)
 		}
-	}
-	// 为了metadata字段的兼容性，统一UnmarshalBodyReusable
-	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
-		return createTaskError(err, "invalid_request", http.StatusBadRequest, true)
+	} else {
+		if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+			return createTaskError(err, "invalid_request", http.StatusBadRequest, true)
+		}
 	}
 
 	if taskErr := validatePrompt(req.Prompt); taskErr != nil {

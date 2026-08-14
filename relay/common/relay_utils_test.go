@@ -65,6 +65,46 @@ func TestValidateBasicTaskRequestNormalizesInputReference(t *testing.T) {
 	}
 }
 
+func TestValidateBasicTaskRequestAcceptsMultipartInputReferenceFile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	buffer := &bytes.Buffer{}
+	writer := multipart.NewWriter(buffer)
+	require.NoError(t, writer.WriteField("prompt", "move the character"))
+	require.NoError(t, writer.WriteField("model", "viduq3-turbo"))
+	require.NoError(t, writer.WriteField("seconds", "5"))
+	require.NoError(t, writer.WriteField("metadata", `{"watermark":false}`))
+	fileWriter, err := writer.CreateFormFile("input_reference", "frame.png")
+	require.NoError(t, err)
+	_, err = fileWriter.Write([]byte("fake png data"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewReader(buffer.Bytes()))
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+	bodyStorage, err := rootcommon.GetBodyStorage(c)
+	require.NoError(t, err)
+	c.Request.Body = io.NopCloser(bodyStorage)
+	info := &RelayInfo{TaskRelayInfo: &TaskRelayInfo{}}
+
+	taskErr := ValidateBasicTaskRequest(c, info, "textGenerate")
+	require.Nil(t, taskErr)
+	req, err := GetTaskRequest(c)
+	require.NoError(t, err)
+	require.Equal(t, "move the character", req.Prompt)
+	require.Equal(t, "viduq3-turbo", req.Model)
+	require.Equal(t, "5", req.Seconds)
+	require.Equal(t, 5, req.Duration)
+	require.Equal(t, false, req.Metadata["watermark"])
+	require.Empty(t, req.InputReference)
+	require.Empty(t, req.Images)
+	require.False(t, req.HasImage())
+	multipartForm, err := c.MultipartForm()
+	require.NoError(t, err)
+	require.Len(t, multipartForm.File["input_reference"], 1)
+}
+
 func TestValidateBasicTaskRequestKeepsImagesPrecedence(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
