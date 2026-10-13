@@ -350,6 +350,11 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
 		relayInfo.UserQuota = userQuota
+		if userQuota <= 0 && !isFactoryTokenBound(relayInfo) {
+			return nil, types.NewErrorWithStatusCode(
+				fmt.Errorf("余额不足，请充值"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
 		// 视频任务改为后结算模式：提交时不预扣，完成后按实际额度扣减。
 		// 为了支持“余额大于 0 即可发起”以及最终允许扣成负数，这里统一走钱包结算。
 		session := &BillingSession{

@@ -63,7 +63,22 @@ func GetTokenOverdraftQuotaLimit() int {
 }
 
 func IsTokenOverdraftAllowed(relayInfo *relaycommon.RelayInfo) bool {
-	return relayInfo != nil && !relayInfo.UsePrice && !relayInfo.ForcePreConsume
+	return relayInfo != nil && !relayInfo.UsePrice && !relayInfo.ForcePreConsume && isFactoryTokenBound(relayInfo)
+}
+
+func isFactoryTokenBound(relayInfo *relaycommon.RelayInfo) bool {
+	if relayInfo == nil || relayInfo.IsPlayground || relayInfo.IsChannelTest {
+		return false
+	}
+	if relayInfo.FactoryTokenBound == nil {
+		bound, err := model.IsEnabledFactoryTokenBound(relayInfo.UserId, relayInfo.TokenId)
+		if err != nil {
+			common.SysLog("failed to check factory token binding: " + err.Error())
+			bound = false
+		}
+		relayInfo.FactoryTokenBound = &bound
+	}
+	return *relayInfo.FactoryTokenBound
 }
 
 func getMinAllowedRemainingQuota(relayInfo *relaycommon.RelayInfo) int {
@@ -75,6 +90,9 @@ func getMinAllowedRemainingQuota(relayInfo *relaycommon.RelayInfo) int {
 
 func getCurrentQuotaFailureKind(relayInfo *relaycommon.RelayInfo, userQuota, tokenQuota int, tokenUnlimited bool) ChargeQuotaFailureKind {
 	if !IsTokenOverdraftAllowed(relayInfo) {
+		if userQuota <= 0 {
+			return ChargeQuotaFailureUser
+		}
 		return ChargeQuotaFailureNone
 	}
 	if userQuota < 0 {
@@ -99,6 +117,10 @@ func BuildChargeQuotaPreview(relayInfo *relaycommon.RelayInfo, userQuota, tokenQ
 		// 视频任务只校验当前绑定令牌是否仍有正余额，实际额度在任务完成后再结算。
 		preview.BillingMode = "video_post_consume"
 		preview.UserQuotaAfterCharge = userQuota - needQuota
+		if userQuota <= 0 && !isFactoryTokenBound(relayInfo) {
+			preview.CurrentFailureKind = ChargeQuotaFailureUser
+			return preview
+		}
 		if tokenUnlimited {
 			preview.TokenQuotaAfterCharge = tokenQuota
 			preview.Allowed = true

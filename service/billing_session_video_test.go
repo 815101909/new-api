@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,10 @@ func TestNewBillingSessionVideoSubmitSkipsPreConsumeAndSettlesByActualQuota(t *t
 
 	seedUser(t, userID, 0)
 	seedToken(t, tokenID, userID, "sk-video-test", tokenRemain)
+	require.NoError(t, model.DB.Create(&model.FactoryAccountBinding{
+		FactoryUserId: userID, NewApiUserId: userID, TokenId: tokenID,
+		Status: 1, FactoryStatus: 1,
+	}).Error)
 
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()

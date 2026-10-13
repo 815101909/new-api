@@ -29,6 +29,18 @@ func (FactoryAccountBinding) TableName() string {
 	return "factory_account_bindings"
 }
 
+func IsEnabledFactoryTokenBound(userId, tokenId int) (bool, error) {
+	if userId <= 0 || tokenId <= 0 {
+		return false, nil
+	}
+	var count int64
+	err := DB.Model(&FactoryAccountBinding{}).Where(
+		"new_api_user_id = ? AND token_id = ? AND status = ? AND factory_status = ?",
+		userId, tokenId, FactoryAccountBindingStatusEnabled, FactoryAccountBindingStatusEnabled,
+	).Count(&count).Error
+	return count > 0, err
+}
+
 func GetFactoryAccountBindingByFactoryUserId(factoryUserId int) (*FactoryAccountBinding, error) {
 	if factoryUserId <= 0 {
 		return nil, errors.New("factory_user_id 为空")
